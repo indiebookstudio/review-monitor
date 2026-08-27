@@ -251,7 +251,8 @@ def run_book_check(
         new_count_for_alert = len(reviews_list)
         new_reviews_objects = reviews_list[:5]
     else:
-        new_count_for_alert = new_count
+        new_count_for_alert = 0 if is_bootstrap else new_count
+        new_reviews_objects = [] if is_bootstrap else new_reviews_objects
         if new_count_for_alert > 0:
             logger.info(f"Found {new_count_for_alert} new reviews for {book.asin} on {book.marketplace}! Triggering alert...")
             total_in_db = db.query(Review).filter(Review.book_id == book.id).count()
@@ -259,16 +260,16 @@ def run_book_check(
             all_ratings = [r[0] for r in ratings_tuples if r[0] is not None]
             avg_rating = round(sum(all_ratings) / len(all_ratings), 1) if all_ratings else 5.0
             
-            if send_email_immediately:
-                email_sent = send_review_alert(
-                    book.title,
-                    book.marketplace,
-                    book.asin,
-                    new_reviews_objects,
-                    db,
-                    total_in_db,
-                    avg_rating
-                )
+            # Send immediate email alert if requested (or when called standalone)
+            email_sent = send_review_alert(
+                book.title,
+                book.marketplace,
+                book.asin,
+                new_reviews_objects,
+                db,
+                total_in_db,
+                avg_rating
+            )
 
     check_run = CheckRun(
         book_id=book.id,
@@ -336,13 +337,17 @@ def run_all_checks(db: Session, force: bool = False, client: Optional[AmazonClie
             })
         total_new += res.get("new_reviews", 0)
 
-    # Send 1 single consolidated digest email if new reviews were found
-    if digest_groups:
-        from app.notifications.email import send_digest_review_alert
-        if send_digest_review_alert(digest_groups, db=db):
-            total_emails = 1
-
     update_check_schedule_timestamps(db)
+
+    # Always send 1 consolidated daily digest email (with new reviews or heartbeat status if 0 new)
+    from app.notifications.email import send_daily_digest_report
+    if send_daily_digest_report(
+        groups=digest_groups,
+        db=db,
+        books_checked=len(books),
+        total_new=total_new
+    ):
+        total_emails = 1
     
     # Audit log
     audit = AuditLog(

@@ -170,7 +170,7 @@ def normalize_marketplace(marketplace: str) -> str:
 def get_product_url(asin: str, marketplace: str = "amazon.it") -> str:
     norm_m = normalize_marketplace(marketplace)
     base = MARKETPLACES.get(norm_m, {}).get("base_url", "https://www.amazon.it")
-    return f"{base}/gp/product/{asin.strip().upper()}"
+    return f"{base}/dp/{asin.strip().upper()}"
 
 def get_reviews_url(asin: str, marketplace: str = "amazon.it", sort_by_recent: bool = True) -> str:
     norm_m = normalize_marketplace(marketplace)

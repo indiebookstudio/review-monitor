@@ -403,12 +403,136 @@ def send_review_alert(
     success, err = send_smtp_email(recipient, subject, body_text, body_html, db=db)
     return success
 
+def build_daily_digest_content(
+    groups: List[Dict[str, Any]],
+    total_books: int,
+    total_reviews_catalog: int,
+    avg_rating_catalog: float,
+    last_check_str: str,
+    next_check_str: str,
+    dashboard_url: str
+) -> Tuple[str, str, str]:
+    total_new = sum(len(g.get("reviews", [])) for g in groups)
+    
+    if total_new > 0:
+        subject = f"[My KDP Reviews] 🟢 Aggiornamento: {total_new} nuove recensioni rilevate ({total_books} libri)"
+        _, text_sub, html_sub = build_digest_email_content(groups, dashboard_url)
+        
+        extra_status_text = f"""
+==================================================
+📊 STATO COMPLESSIVO DEL CATALOGO:
+• Libri monitorati: {total_books}
+• Recensioni totali: {total_reviews_catalog}
+• Rating medio: {avg_rating_catalog} ★
+• Ultimo controllo: {last_check_str}
+• Prossimo controllo: {next_check_str}
+==================================================
+"""
+        extra_status_html = f"""
+  <div style="margin-top: 20px; padding: 14px; background: #f1f5f9; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px;">
+    <div style="font-weight: 700; color: #0f172a; margin-bottom: 6px;">📊 Stato Complessivo Catalogo:</div>
+    <div style="color: #475569;">
+      &bull; <strong>{total_books}</strong> libri monitorati &bull; <strong>{total_reviews_catalog}</strong> recensioni totali &bull; Rating medio: <strong>{avg_rating_catalog} ★</strong><br>
+      &bull; Prossimo controllo programmato: <strong>{next_check_str}</strong>
+    </div>
+  </div>
+"""
+        body_text = text_sub + extra_status_text
+        body_html = html_sub.replace("</body>", f"{extra_status_html}</body>")
+        return subject, body_text, body_html
+
+    # 0 new reviews -> Heartbeat confirmation email
+    subject = f"[My KDP Reviews] 🟢 Monitor Attivo: 0 nuove recensioni (Tutto regolare)"
+    
+    body_text = f"""My KDP Reviews - Report Giornaliero di Controllo
+
+✅ Il monitoraggio automatico è ATTIVO e ha completato con successo la scansione programmata.
+Nessuna nuova recensione trovata in questo controllo.
+
+--------------------------------------------------
+📊 RIEPILOGO CATALOGO:
+• Libri monitorati: {total_books}
+• Recensioni totali archiviate: {total_reviews_catalog}
+• Rating medio complessivo: {avg_rating_catalog} ★
+• Ultimo controllo: {last_check_str}
+• Prossimo controllo: {next_check_str}
+--------------------------------------------------
+
+Apri Dashboard: {dashboard_url}
+"""
+
+    body_html = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; color: #1e293b; line-height: 1.5; padding: 20px 10px; max-width: 600px; margin: 0 auto;">
+  <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+    
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 14px;">
+      <span style="font-size: 24px;">🟢</span>
+      <div>
+        <h2 style="font-size: 18px; color: #0f172a; margin: 0; font-weight: 800;">My KDP Reviews - Report di Monitoraggio</h2>
+        <span style="font-size: 13px; color: #16a34a; font-weight: 600;">✓ Sistema attivo &bull; Controllo completato regolarmente</span>
+      </div>
+    </div>
+
+    <p style="color: #334155; font-size: 14px; margin-bottom: 18px;">
+      Il sistema di monitoraggio ha completato la scansione automatica dei tuoi libri su Amazon. 
+      <strong>Non sono state rilevate nuove recensioni</strong> durante questo controllo.
+    </p>
+
+    <!-- Catalog KPI Box -->
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+      <div style="font-size: 13px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">
+        Riepilogo Catalogo Attuale
+      </div>
+      <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+        <tr>
+          <td style="padding: 6px 0; color: #64748b;">Libri Monitorati:</td>
+          <td style="padding: 6px 0; font-weight: 700; color: #0f172a; text-align: right;">{total_books}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #64748b;">Recensioni Totali:</td>
+          <td style="padding: 6px 0; font-weight: 700; color: #0284c7; text-align: right;">{total_reviews_catalog}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #64748b;">Rating Medio Globale:</td>
+          <td style="padding: 6px 0; font-weight: 700; color: #f59e0b; text-align: right;">{avg_rating_catalog} ★</td>
+        </tr>
+        <tr style="border-top: 1px solid #e2e8f0;">
+          <td style="padding: 8px 0 0 0; color: #64748b; font-size: 12px;">Ultimo Controllo:</td>
+          <td style="padding: 8px 0 0 0; color: #334155; font-size: 12px; text-align: right;">{last_check_str}</td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 0 0 0; color: #64748b; font-size: 12px;">Prossimo Controllo:</td>
+          <td style="padding: 4px 0 0 0; color: #2563eb; font-weight: 600; font-size: 12px; text-align: right;">{next_check_str}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Action Button -->
+    <div style="text-align: center; margin-top: 24px;">
+      <a href="{dashboard_url}" target="_blank" style="display: inline-block; background: #0284c7; color: #ffffff; padding: 11px 22px; border-radius: 6px; text-decoration: none; font-weight: 700; font-size: 14px;">
+        👉 Apri Dashboard My KDP Reviews
+      </a>
+    </div>
+
+    <p style="margin-top: 24px; font-size: 12px; color: #94a3b8; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 14px;">
+      Ricevi questa email perché hai attivato il report di monitoraggio automatico per i tuoi libri KDP.
+    </p>
+  </div>
+</body>
+</html>
+"""
+    return subject, body_text, body_html
+
 def send_digest_review_alert(
     groups: List[Dict[str, Any]], 
     db: Optional[Session] = None
 ) -> bool:
     """
-    Sends a single consolidated email for all new reviews found across all books in an update batch.
+    Sends a consolidated email for reviews found across books in an update batch.
     """
     valid_groups = [g for g in groups if g.get("reviews")]
     if not valid_groups:
@@ -426,6 +550,70 @@ def send_digest_review_alert(
 
     dashboard_url = get_setting(db, "dashboard_url", settings.DASHBOARD_URL) or "http://localhost:8000"
     subject, body_text, body_html = build_digest_email_content(valid_groups, dashboard_url)
+    
+    success, err = send_smtp_email(recipient, subject, body_text, body_html, db=db)
+    return success
+
+def send_daily_digest_report(
+    groups: List[Dict[str, Any]],
+    db: Optional[Session] = None,
+    books_checked: int = 0,
+    total_new: int = 0
+) -> bool:
+    """
+    Always sends a daily summary digest email after a scheduled or manual batch run,
+    confirming the monitor status even if 0 new reviews were found.
+    """
+    notifications_enabled = get_setting(db, "notifications_enabled", True)
+    if not notifications_enabled:
+        logger.info("Email notifications disabled. Skipping daily digest.")
+        return False
+        
+    recipient = get_setting(db, "alert_email", settings.ALERT_EMAIL)
+    if not recipient:
+        logger.warning("No recipient email configured for daily digest.")
+        return False
+
+    total_books_catalog = books_checked
+    total_reviews_catalog = 0
+    avg_rating_catalog = 0.0
+    import datetime
+    now_dt = datetime.datetime.now(datetime.timezone.utc)
+    last_check_str = now_dt.strftime("%d/%m/%Y alle %H:%M UTC")
+    next_check_str = (now_dt + datetime.timedelta(hours=24)).strftime("%d/%m/%Y alle %H:%M UTC")
+
+    if db is not None:
+        from app.models import Book, Review, AppSetting
+        from sqlalchemy import func
+        distinct_asins = db.query(func.count(func.distinct(Book.asin))).scalar() or 0
+        total_books_catalog = distinct_asins if distinct_asins > 0 else books_checked
+        total_reviews_catalog = db.query(Review).count()
+        avg_res = db.query(func.avg(Review.rating)).scalar()
+        avg_rating_catalog = round(float(avg_res), 2) if avg_res is not None else 5.0
+        
+        last_s = db.query(AppSetting).filter(AppSetting.key == "last_check_at").first()
+        if last_s and last_s.value:
+            try:
+                last_check_str = datetime.datetime.fromisoformat(last_s.value).strftime("%d/%m/%Y alle %H:%M")
+            except Exception:
+                pass
+        next_s = db.query(AppSetting).filter(AppSetting.key == "next_check_at").first()
+        if next_s and next_s.value:
+            try:
+                next_check_str = datetime.datetime.fromisoformat(next_s.value).strftime("%d/%m/%Y alle %H:%M")
+            except Exception:
+                pass
+
+    dashboard_url = get_setting(db, "dashboard_url", settings.DASHBOARD_URL) or "http://localhost:8000"
+    subject, body_text, body_html = build_daily_digest_content(
+        groups=groups,
+        total_books=total_books_catalog,
+        total_reviews_catalog=total_reviews_catalog,
+        avg_rating_catalog=avg_rating_catalog,
+        last_check_str=last_check_str,
+        next_check_str=next_check_str,
+        dashboard_url=dashboard_url
+    )
     
     success, err = send_smtp_email(recipient, subject, body_text, body_html, db=db)
     return success
