@@ -1,0 +1,45 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments & Virtualenv
+.env
+.env.*
+!.env.example
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# SQLite databases & Local data
+data/*.sqlite
+*.sqlite
+*.sqlite3
+!data/reviews.db
+
+# Playwright & Browsers
+.playwright/
+playwright-report/
+test-results/
+
+# Secrets & Credentials
+secrets/
+credentials/
+*.pem
+*.key
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/

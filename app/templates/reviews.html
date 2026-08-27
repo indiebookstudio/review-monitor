@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Tutte le Recensioni - KDP Performance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">⭐ Tutte le Recensioni</h1>
+    <div style="font-size: 0.88rem; color: var(--text-subtle); margin-top: 2px;">
+      Elenco cronologico di tutte le recensioni registrate sui tuoi libri
+    </div>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="main-card" style="padding: 18px 24px; margin-bottom: 20px;">
+  <form method="GET" action="/reviews" style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;">
+    <div style="min-width: 180px;">
+      <label class="form-label" style="font-size: 0.82rem;">Filtra per Rating:</label>
+      <select name="rating" class="form-control" style="padding: 8px 12px; font-size: 0.9rem;">
+        <option value="">Tutti i Rating</option>
+        <option value="5" {% if selected_rating == 5 %}selected{% endif %}>★★★★★ (5 Stelle)</option>
+        <option value="4" {% if selected_rating == 4 %}selected{% endif %}>★★★★☆ (4 Stelle)</option>
+        <option value="3" {% if selected_rating == 3 %}selected{% endif %}>★★★☆☆ (3 Stelle)</option>
+        <option value="2" {% if selected_rating == 2 %}selected{% endif %}>★★☆☆☆ (2 Stelle)</option>
+        <option value="1" {% if selected_rating == 1 %}selected{% endif %}>★☆☆☆☆ (1 Stella)</option>
+      </select>
+    </div>
+
+    <div style="min-width: 180px;">
+      <label class="form-label" style="font-size: 0.82rem;">Filtra per Marketplace:</label>
+      <select name="marketplace" class="form-control" style="padding: 8px 12px; font-size: 0.9rem;">
+        <option value="">Tutti i Marketplace</option>
+        {% for m in marketplaces %}
+          <option value="{{ m }}" {% if selected_marketplace == m %}selected{% endif %}>{{ m }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <button type="submit" class="btn btn-secondary btn-sm" style="height: 42px;">Filtra</button>
+    <a href="/reviews" class="btn btn-secondary btn-sm" style="height: 42px;">Mostra Tutte</a>
+  </form>
+</div>
+
+<!-- Reviews List -->
+<div class="main-card">
+  <div class="card-header-clean">
+    <h2 style="font-size: 1.15rem; font-weight: 800; color: #0f172a; margin: 0;">
+      Recensioni Trovate ({{ reviews_data|length }})
+    </h2>
+  </div>
+
+  <div style="padding: 20px;">
+    {% if reviews_data and reviews_data|length > 0 %}
+      {% for rev, book in reviews_data %}
+      <div class="review-card-item {% if rev.rating <= 3.0 %}negative-review{% else %}positive-review{% endif %}">
+        <div class="review-item-header">
+          <div>
+            <span class="stars-rating">
+              {% for i in range(rev.rating|round|int) %}★{% endfor %}{% for i in range(5 - (rev.rating|round|int)) %}☆{% endfor %}
+            </span>
+            <span style="font-weight: 700; font-size: 0.95rem; margin-left: 8px;">{{ rev.rating }}/5</span>
+            <span style="color: var(--text-subtle); font-size: 0.88rem; margin-left: 12px;">
+              su <a href="/book/{{ book.id }}" style="font-weight: 700; color: #0f172a;">{{ book.title }}</a> ({{ rev.marketplace }})
+            </span>
+            {% if rev.rating <= 3.0 %}
+              <span class="badge badge-danger" style="margin-left: 8px;">Critica</span>
+            {% endif %}
+          </div>
+          <div>
+            <a href="{{ rev.review_url }}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Apri su Amazon ↗</a>
+          </div>
+        </div>
+        
+        <div class="review-item-title">{{ rev.title }}</div>
+        
+        <div class="review-item-meta">
+          Scritta da <strong>{{ rev.author }}</strong> &bull; Data: <strong>{{ rev.review_date or 'N/D' }}</strong> &bull; Rilevata il: {{ rev.first_seen_at.strftime('%d/%m/%Y %H:%M') }}
+        </div>
+        
+        {% if rev.body %}
+          <div class="review-item-body">{{ rev.body }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+      <p style="color: var(--text-subtle); font-size: 0.9rem; padding: 30px 0; text-align: center;">
+        Nessuna recensione corrispondente ai filtri selezionati.
+      </p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

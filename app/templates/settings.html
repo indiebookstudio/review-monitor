@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}Impostazioni - My KDP Reviews{% endblock %}
+
+{% block content %}
+<div class="page-header" style="margin-bottom: 20px;">
+  <div>
+    <h1 style="font-size: 1.35rem; font-weight: 800; color: #0f172a; margin: 0;">Impostazioni & Notifiche</h1>
+  </div>
+</div>
+
+{% if msg %}
+<div class="alert-banner alert-success">
+  <span>✓ {{ msg }}</span>
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert-banner alert-error">
+  <span>⚠️ {{ error }}</span>
+</div>
+{% endif %}
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+  <!-- Notifications & Frequency -->
+  <div class="main-card" style="margin-bottom: 0;">
+    <div class="card-header-clean">
+      <h2 style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin: 0;">Notifiche Email</h2>
+    </div>
+
+    <div style="padding: 24px;">
+      <form action="/settings/update" method="POST">
+        <!-- Notification Destination Email -->
+        <div class="form-group">
+          <label for="alert_email" class="form-label">Email Destinatario:</label>
+          <input 
+            type="email" 
+            id="alert_email" 
+            name="alert_email" 
+            class="form-control" 
+            value="{{ alert_email or 'saluccimarco@gmail.com' }}" 
+            placeholder="nome@dominio.com"
+            required
+            style="font-size: 1rem; font-weight: 600;"
+          >
+        </div>
+
+        <!-- Notifications Toggle -->
+        <div class="form-group">
+          <label class="form-check">
+            <input 
+              type="checkbox" 
+              name="notifications_enabled" 
+              value="true" 
+              {% if notifications_enabled %}checked{% endif %}
+            >
+            <span style="font-size: 0.92rem; font-weight: 600; color: var(--text-main);">
+              Invia notifica email quando viene rilevata una nuova recensione
+            </span>
+          </label>
+        </div>
+
+        <!-- Frequency -->
+        <div class="form-group">
+          <label for="check_frequency" class="form-label">Frequenza di Controllo:</label>
+          <select id="check_frequency" name="check_frequency" class="form-control">
+            <option value="1h" {% if check_frequency == '1h' %}selected{% endif %}>Ogni 1 ora</option>
+            <option value="6h" {% if check_frequency == '6h' %}selected{% endif %}>Ogni 6 ore</option>
+            <option value="12h" {% if check_frequency == '12h' %}selected{% endif %}>Ogni 12 ore</option>
+            <option value="24h" {% if check_frequency in ['24h', '1d'] %}selected{% endif %}>Ogni 24 ore (1 volta al giorno)</option>
+            <option value="3d" {% if check_frequency == '3d' %}selected{% endif %}>Ogni 3 giorni</option>
+            <option value="7d" {% if check_frequency == '7d' %}selected{% endif %}>Ogni 7 giorni (1 volta a settimana)</option>
+          </select>
+          <div style="font-size: 0.8rem; color: var(--text-subtle); margin-top: 5px;">
+            Prossimo controllo stimato: <strong>{{ next_check_at[:16].replace('T', ' ') if next_check_at else 'Al prossimo ciclo' }}</strong>
+          </div>
+        </div>
+
+        <!-- Dashboard Public URL -->
+        <div class="form-group">
+          <label for="dashboard_url" class="form-label">URL Applicazione:</label>
+          <input 
+            type="url" 
+            id="dashboard_url" 
+            name="dashboard_url" 
+            class="form-control" 
+            value="{{ dashboard_url }}" 
+            placeholder="http://localhost:8000"
+          >
+        </div>
+
+        <!-- Collapsible Advanced SMTP (Optional) -->
+        <details style="margin: 20px 0; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px; background: var(--bg-subtle);">
+          <summary style="font-size: 0.85rem; font-weight: 700; color: var(--text-subtle); cursor: pointer;">
+            Server SMTP Personalizzato (Opzionale)
+          </summary>
+          <div style="margin-top: 14px;">
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
+              <div class="form-group">
+                <label for="smtp_host" class="form-label" style="font-size: 0.8rem;">Host:</label>
+                <input type="text" id="smtp_host" name="smtp_host" class="form-control" value="{{ smtp_host or '' }}" placeholder="es. smtp.gmail.com">
+              </div>
+              <div class="form-group">
+                <label for="smtp_port" class="form-label" style="font-size: 0.8rem;">Porta:</label>
+                <input type="number" id="smtp_port" name="smtp_port" class="form-control" value="{{ smtp_port or '587' }}">
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="smtp_user" class="form-label" style="font-size: 0.8rem;">Utente:</label>
+              <input type="text" id="smtp_user" name="smtp_user" class="form-control" value="{{ smtp_user or '' }}">
+            </div>
+            <div class="form-group">
+              <label for="smtp_pass" class="form-label" style="font-size: 0.8rem;">Password:</label>
+              <input type="password" id="smtp_pass" name="smtp_pass" class="form-control" placeholder="••••••••">
+            </div>
+          </div>
+        </details>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 10px;">Salva Impostazioni</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Security & Password -->
+  <div style="display: flex; flex-direction: column; gap: 24px;">
+    <div class="main-card">
+      <div class="card-header-clean">
+        <h2 style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin: 0;">Password di Accesso</h2>
+      </div>
+      <div style="padding: 24px;">
+        <form action="/settings/password" method="POST">
+          <div class="form-group">
+            <label for="current_password" class="form-label">Password Attuale:</label>
+            <input type="password" id="current_password" name="current_password" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="new_password" class="form-label">Nuova Password:</label>
+            <input type="password" id="new_password" name="new_password" class="form-control" required minlength="6">
+          </div>
+          <div class="form-group">
+            <label for="confirm_password" class="form-label">Conferma Nuova Password:</label>
+            <input type="password" id="confirm_password" name="confirm_password" class="form-control" required minlength="6">
+          </div>
+          <button type="submit" class="btn btn-secondary" style="width: 100%; padding: 10px;">Aggiorna Password</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Test Email Card -->
+    <div class="main-card">
+      <div class="card-header-clean">
+        <h2 style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin: 0;">Test Notifica</h2>
+      </div>
+      <div style="padding: 24px;">
+        <p style="font-size: 0.88rem; color: var(--text-subtle); margin-bottom: 16px; line-height: 1.4;">
+          Invia un'email di prova all'indirizzo configurato per verificare la corretta ricezione degli alert.
+        </p>
+        <form action="/settings/test-email" method="POST">
+          <button type="submit" class="btn btn-secondary" style="width: 100%; padding: 10px;">Invia Email di Prova</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

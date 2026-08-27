@@ -1,0 +1,380 @@
+{% extends "base.html" %}
+
+{% block title %}I Miei Libri - KDP Performance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">📚 I Miei Libri</h1>
+    <div style="font-size: 0.88rem; color: var(--text-subtle); margin-top: 2px;">
+      Gestisci i tuoi ASIN, prezzi, formati Kindle e lo stato di sincronizzazione su tutti i marketplace
+    </div>
+  </div>
+  <div class="btn-group">
+    <button type="button" class="btn btn-secondary" onclick="startLiveCheck('/books/stream-check/all', '🔄 Controllo Globale Tutti i Libri')">
+      🔄 Controlla Tutti
+    </button>
+    <button class="btn btn-primary" onclick="openModal('addBookModal')">+ Aggiungi Libro</button>
+  </div>
+</div>
+
+{% if msg %}
+<div class="alert-banner alert-success">
+  <span>✓ {{ msg }}</span>
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert-banner alert-error">
+  <span>⚠️ {{ error }}</span>
+</div>
+{% endif %}
+
+<div class="main-card">
+  <div class="card-header-clean">
+    <h2 style="font-size: 1.15rem; font-weight: 800; color: #0f172a; margin: 0;">
+      Elenco Libri Registrati ({{ books_summary|length }})
+    </h2>
+    <div style="font-size: 0.85rem; color: var(--text-subtle);">
+      Colonna <strong>#</strong> fissa e progressiva &bull; Clicca sulle intestazioni per riordinare
+    </div>
+  </div>
+
+  {% if books_summary and books_summary|length > 0 %}
+  <div class="table-container">
+    <table class="dashboard-table sortable-table" style="width: 100%; table-layout: auto;">
+      <thead>
+        <tr>
+          <th style="width: 36px; text-align: center;">#</th>
+          <th class="sortable-th" data-sort-type="string" style="min-width: 240px;">Copertina &amp; Titolo</th>
+          <th class="sortable-th" data-sort-type="string" style="width: 90px;">ASIN</th>
+          <th class="sortable-th" data-sort-type="string" style="width: 110px;">Marketplace</th>
+          <th class="sortable-th" data-sort-type="string" style="width: 75px; text-align: center;">Prezzo</th>
+          <th class="sortable-th" data-sort-type="string" style="width: 95px; text-align: center;">Kindle</th>
+          <th class="sortable-th" data-sort-type="number" style="text-align: center; width: 75px;">Rec.</th>
+          <th class="sortable-th" data-sort-type="number" style="text-align: center; width: 65px;">Rating</th>
+          <th class="sortable-th" data-sort-type="string" style="width: 65px; text-align: center;">Stato</th>
+          <th style="text-align: right; width: 200px;">Azioni</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in books_summary %}
+        <tr>
+          <!-- Progressive Index (#) -->
+          <td class="row-num-cell"></td>
+
+          <!-- Copertina & Titolo -->
+          <td data-sort-val="{{ item.book.title }}" style="padding: 8px 10px;">
+            <div class="book-cover-cell">
+              <a href="{{ item.book.product_url }}" target="_blank" rel="noopener" class="book-thumb-wrapper" title="Apri su Amazon {{ item.book.marketplace }}">
+                {% if item.book.cover_image_url %}
+                  <img src="{{ item.book.cover_image_url }}" alt="Cover" class="book-thumb-img" loading="lazy" />
+                {% else %}
+                  <div class="book-thumb-fallback">📚</div>
+                {% endif %}
+              </a>
+              <div style="flex: 1; min-width: 0;">
+                <a href="{{ item.book.product_url }}" 
+                   target="_blank" 
+                   rel="noopener"
+                   class="book-title-cell" 
+                   title="Apri '{{ item.book.title }}' su Amazon {{ item.book.marketplace }}"
+                   style="font-size: 0.92rem; font-weight: 700; color: #1e293b; text-decoration: none; line-height: 1.35; display: inline-block;">
+                  {{ item.book.title }} <span style="font-size: 0.8rem; color: var(--primary);">↗</span>
+                </a>
+              </div>
+            </div>
+          </td>
+
+          <!-- ASIN (Non cliccabile) -->
+          <td style="white-space: nowrap; user-select: all;" data-sort-val="{{ item.book.asin }}">
+            <code style="background: var(--bg-subtle); padding: 3px 6px; border-radius: 4px; font-weight: 700; color: var(--text-main); font-size: 0.82rem; border: 1px solid var(--border-color);">
+              {{ item.book.asin }}
+            </code>
+          </td>
+
+          <!-- Marketplace -->
+          <td data-sort-val="{{ item.book.marketplace }}">
+            <a href="{{ item.book.product_url }}" target="_blank" rel="noopener" style="text-decoration: none;">
+              <span class="badge badge-neutral" style="cursor: pointer; font-size: 0.78rem;" title="Apri su {{ item.book.marketplace }}">
+                {% if 'amazon.it' in item.book.marketplace %}🇮🇹 IT
+                {% elif 'amazon.com.be' in item.book.marketplace %}🇧🇪 BE
+                {% elif 'amazon.com.au' in item.book.marketplace %}🇦🇺 AU
+                {% elif 'amazon.com' in item.book.marketplace %}🇺🇸 US
+                {% elif 'amazon.co.uk' in item.book.marketplace %}🇬🇧 UK
+                {% elif 'amazon.de' in item.book.marketplace %}🇩🇪 DE
+                {% elif 'amazon.fr' in item.book.marketplace %}🇫🇷 FR
+                {% elif 'amazon.es' in item.book.marketplace %}🇪🇸 ES
+                {% elif 'amazon.nl' in item.book.marketplace %}🇳🇱 NL
+                {% elif 'amazon.pl' in item.book.marketplace %}🇵🇱 PL
+                {% elif 'amazon.se' in item.book.marketplace %}🇸🇪 SE
+                {% elif 'amazon.ie' in item.book.marketplace %}🇮🇪 IE
+                {% elif 'amazon.co.jp' in item.book.marketplace %}🇯🇵 JP
+                {% elif 'amazon.ca' in item.book.marketplace %}🇨🇦 CA
+                {% else %}{{ item.book.marketplace }}
+                {% endif %}
+              </span>
+            </a>
+          </td>
+
+          <!-- Prezzo -->
+          <td style="text-align: center;" data-sort-val="{{ item.book.price or '0' }}">
+            {% if item.book.price %}
+              <span class="price-tag" style="font-size: 0.82rem;">{{ item.book.price }}</span>
+            {% else %}
+              <span style="color: var(--text-subtle); font-size: 0.82rem;">—</span>
+            {% endif %}
+          </td>
+
+          <!-- Versione Kindle -->
+          <td style="text-align: center;" data-sort-val="{% if item.book.has_kindle %}1_{{ item.book.kindle_price }}{% else %}0{% endif %}">
+            {% if item.book.has_kindle %}
+              <span class="kindle-badge" style="font-size: 0.78rem;" title="Disponibile formato Kindle">
+                📱 {{ item.book.kindle_price or 'Sì' }}
+              </span>
+            {% else %}
+              <span class="kindle-badge not-available" style="font-size: 0.78rem;">
+                —
+              </span>
+            {% endif %}
+          </td>
+
+          <!-- Recensioni -->
+          <td style="text-align: center;" data-sort-val="{{ item.stats.total_reviews }}">
+            <a href="/book/{{ item.book.id }}" style="text-decoration: none;">
+              <div class="reviews-pill {% if item.stats.total_reviews > 0 %}has-reviews{% endif %}" style="padding: 3px 8px; font-size: 0.85rem;">
+                💬 {{ item.stats.total_reviews }}
+              </div>
+            </a>
+          </td>
+
+          <!-- Rating -->
+          <td style="text-align: center;" data-sort-val="{{ item.stats.avg_rating }}">
+            <a href="/book/{{ item.book.id }}" style="text-decoration: none;">
+              {% if item.stats.total_reviews > 0 %}
+                <span class="stars-rating" style="font-size: 0.88rem;">{{ item.stats.avg_rating }} ★</span>
+              {% else %}
+                <span style="color: var(--text-subtle); font-size: 0.82rem;">-</span>
+              {% endif %}
+            </a>
+          </td>
+
+          <!-- Stato -->
+          <td style="text-align: center;" data-sort-val="{{ '1_attivo' if item.book.enabled else '0_pausa' }}">
+            {% if item.book.enabled %}
+              <span class="badge badge-success" style="font-size: 0.75rem; padding: 2px 6px;">🟢</span>
+            {% else %}
+              <span class="badge badge-neutral" style="font-size: 0.75rem; padding: 2px 6px;">⏸</span>
+            {% endif %}
+          </td>
+
+          <!-- Azioni -->
+          <td style="text-align: right; white-space: nowrap; padding: 8px;">
+            <div class="btn-group" style="justify-content: flex-end; gap: 3px;">
+              <button type="button" class="btn btn-secondary btn-sm" style="padding: 3px 6px; font-size: 0.78rem;" onclick="startLiveCheck('/books/stream-check/book/{{ item.book.id }}', '🔄 Controllo {{ item.book.marketplace }}')" title="Forza controllo con log live">
+                🔄
+              </button>
+
+              <button 
+                type="button" 
+                class="btn btn-secondary btn-sm" 
+                style="padding: 3px 6px; font-size: 0.78rem; color: var(--warning);"
+                onclick="openResetBookModal('{{ item.book.id }}', '{{ item.book.title | escape }}', '{{ item.book.asin }}', false)"
+                title="Azzera recensioni di questo libro">
+                🗑️
+              </button>
+              
+              <a href="/book/{{ item.book.id }}" class="btn btn-secondary btn-sm" style="padding: 3px 6px; font-size: 0.78rem;" title="Dettaglio">Info</a>
+              
+              <button 
+                class="btn btn-secondary btn-sm" 
+                style="padding: 3px 6px; font-size: 0.78rem;"
+                onclick="openEditBookModal('{{ item.book.id }}', '{{ item.book.asin }}', '{{ item.book.marketplace }}', '{{ item.book.title | escape }}', '{{ item.book.price or '' }}', '{{ item.book.cover_image_url or '' }}')"
+                title="Modifica Libro">
+                ✏️
+              </button>
+
+              <button 
+                class="btn btn-danger btn-sm" 
+                style="padding: 3px 6px; font-size: 0.78rem;"
+                onclick="openDeleteBookModal('{{ item.book.id }}', '{{ item.book.title | escape }}', '{{ item.book.asin }}')"
+                title="Elimina solo questa voce">
+                ❌
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="text-align: center; padding: 60px 20px;">
+    <p style="color: var(--text-subtle); font-size: 1.1rem; margin-bottom: 16px;">Nessun libro inserito nel database.</p>
+    <button class="btn btn-primary" onclick="openModal('addBookModal')">+ Aggiungi Libro</button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Modal Aggiungi Libro (Solo ASIN con Ricerca Automatica & Live Preview) -->
+<div class="modal-overlay" id="addBookModal">
+  <div class="modal-content" style="max-width: 580px;">
+    <div class="modal-header">
+      <h3 class="modal-title">📖 Aggiungi Libro KDP</h3>
+      <button class="modal-close" onclick="closeModal('addBookModal')">&times;</button>
+    </div>
+    <form action="/books/add" method="POST" id="addBookForm">
+      <input type="hidden" name="title" id="hidden_title">
+      <input type="hidden" name="cover_image_url" id="hidden_cover_image_url">
+      <input type="hidden" name="price" id="hidden_price">
+      <input type="hidden" name="has_kindle" id="hidden_has_kindle">
+      <input type="hidden" name="kindle_price" id="hidden_kindle_price">
+      <input type="hidden" name="selected_marketplaces" id="hidden_selected_marketplaces" value="all">
+
+      <div class="form-group">
+        <label for="asin" class="form-label">Codice ASIN Amazon (o link del libro):</label>
+        <div style="display: flex; gap: 8px;">
+          <input 
+            type="text" 
+            id="asin" 
+            name="asin" 
+            class="form-control" 
+            placeholder="es. B0H6MN4LW7" 
+            required 
+            maxlength="100"
+            style="font-size: 1.15rem; font-weight: 700; letter-spacing: 1px;"
+            autofocus
+          >
+          <button type="button" class="btn btn-secondary" id="scanAsinBtn" style="white-space: nowrap; font-weight: 700;">
+            🔍 Cerca
+          </button>
+        </div>
+        <div style="font-size: 0.82rem; color: var(--text-subtle); margin-top: 6px;">
+          ✨ <strong>Zero fatica:</strong> Inserisci solo l'ASIN. Verranno scaricati copertina, titolo reale, prezzo cartaceo, disponibilità versione Kindle e tutti i 14 marketplace Amazon!
+        </div>
+      </div>
+
+      <!-- Live Loading State Animation -->
+      <div class="scanner-status-box" id="scannerStatusBox">
+        <div style="display: flex; align-items: center; gap: 10px; font-size: 0.92rem; font-weight: 600; color: #0284c7;">
+          <span>🌐 Ricerca e download informazioni in corso su tutti i 14 marketplace Amazon...</span>
+        </div>
+        <div class="scanner-progress-bar">
+          <div class="scanner-progress-bar-fill"></div>
+        </div>
+      </div>
+
+      <!-- Live Downloaded Metadata Preview Card -->
+      <div class="scan-result-card" id="scanResultCard">
+        <div style="display: flex; gap: 16px; align-items: flex-start;">
+          <div class="book-thumb-wrapper" style="width: 70px; height: 95px;">
+            <img id="previewCoverImg" src="" alt="Copertina" class="book-thumb-img" style="display: none;" />
+            <div id="previewCoverFallback" class="book-thumb-fallback" style="font-size: 2.2rem; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">📚</div>
+          </div>
+          <div style="flex: 1;">
+            <div id="previewTitle" style="font-size: 1rem; font-weight: 800; color: #0f172a; margin-bottom: 6px; line-height: 1.35;"></div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px;">
+              <span id="previewPrice" class="price-tag"></span>
+              <span id="previewKindle" class="kindle-badge"></span>
+            </div>
+            <div style="font-size: 0.82rem; color: var(--text-subtle); margin-top: 4px;">
+              Marketplace KDP Rilevati:
+            </div>
+            <div class="marketplaces-grid" id="previewMarketplacesList"></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addBookModal')">Annulla</button>
+        <button type="submit" class="btn btn-primary" id="addBookSubmitBtn" style="padding: 10px 24px; font-weight: 700;">+ AGGIUNGI IN TABELLA</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Modifica Libro -->
+<div class="modal-overlay" id="editBookModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 class="modal-title">Modifica Libro</h3>
+      <button class="modal-close" onclick="closeModal('editBookModal')">&times;</button>
+    </div>
+    <form id="editBookForm" method="POST">
+      <div class="form-group">
+        <label for="edit_asin" class="form-label">ASIN Amazon:</label>
+        <input type="text" id="edit_asin" name="asin" class="form-control" required maxlength="10">
+      </div>
+
+      <div class="form-group">
+        <label for="edit_marketplace" class="form-label">Marketplace:</label>
+        <select id="edit_marketplace" name="marketplace" class="form-control">
+          {% for domain, meta in marketplaces.items() %}
+            <option value="{{ domain }}">{{ meta.flag }} {{ meta.code }} ({{ domain }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="edit_title" class="form-label">Titolo:</label>
+        <input type="text" id="edit_title" name="title" class="form-control" required>
+      </div>
+
+      <div class="form-group">
+        <label for="edit_price" class="form-label">Prezzo di vendita:</label>
+        <input type="text" id="edit_price" name="price" class="form-control" placeholder="es. €12,90">
+      </div>
+
+      <div class="form-group">
+        <label for="edit_cover" class="form-label">URL Copertina:</label>
+        <input type="text" id="edit_cover" name="cover_image_url" class="form-control" placeholder="https://...">
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('editBookModal')">Annulla</button>
+        <button type="submit" class="btn btn-primary">Salva Modifiche</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Conferma Reset Recensioni -->
+<div class="modal-overlay" id="resetBookModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 class="modal-title" style="color: var(--danger);">🔄 Conferma Reset Recensioni</h3>
+      <button class="modal-close" onclick="closeModal('resetBookModal')">&times;</button>
+    </div>
+    <form id="resetBookForm" method="POST">
+      <p id="resetBookTitle" style="margin-bottom: 16px; color: var(--text-main); font-size: 0.95rem; line-height: 1.5;"></p>
+      
+      <div style="background: var(--warning-bg); border: 1px solid var(--warning-border); border-left: 4px solid var(--warning); padding: 12px; margin-bottom: 20px; font-size: 0.88rem; color: #b45309; border-radius: 4px;">
+        <strong>Nota:</strong> Tutte le recensioni salvate per questo titolo verranno cancellate. Potrai poi eseguire <strong>"🔄 Aggiorna"</strong> per riscaricarle da Amazon e testare la notifica email.
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('resetBookModal')">Annulla</button>
+        <button type="submit" class="btn btn-danger">Azzera Recensioni Ora</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Elimina Libro Singolo -->
+<div class="modal-overlay" id="deleteBookModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 class="modal-title" style="color: var(--danger);">⚠️ Conferma Eliminazione</h3>
+      <button class="modal-close" onclick="closeModal('deleteBookModal')">&times;</button>
+    </div>
+    <form id="deleteBookForm" method="POST">
+      <p id="deleteBookTitle" style="margin-bottom: 16px; color: var(--text-main); font-size: 0.95rem; line-height: 1.5;"></p>
+      
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('deleteBookModal')">Annulla</button>
+        <button type="submit" class="btn btn-danger">Elimina Questa Voce</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

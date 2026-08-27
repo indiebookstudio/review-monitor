@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Login - My KDP Reviews{% endblock %}
+
+{% block content %}
+<div class="login-wrapper">
+  <div class="login-card">
+    <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px;">
+      <img src="/static/img/logo.jpg" alt="Logo" style="width: 32px; height: 32px; object-fit: contain; border-radius: 6px;" />
+      <span class="login-logo" style="margin: 0;">My KDP Reviews</span>
+    </div>
+    <div class="login-subtitle" style="margin-bottom: 24px;">Monitoraggio Recensioni Amazon KDP</div>
+
+    {% if error %}
+    <div class="alert-banner alert-error" style="margin-bottom: 20px; font-size: 0.85rem;">
+      {{ error }}
+    </div>
+    {% endif %}
+
+    <form action="/login" method="POST">
+      <input type="hidden" name="next" value="{{ next }}">
+      
+      <div class="form-group" style="text-align: left;">
+        <label for="password" class="form-label">Password di Accesso:</label>
+        <input 
+          type="password" 
+          id="password" 
+          name="password" 
+          class="form-control" 
+          placeholder="Inserisci password..." 
+          required 
+          autofocus
+        >
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="width: 100%; padding: 11px; margin-top: 10px; font-size: 0.95rem; font-weight: 700;">
+        Accedi
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

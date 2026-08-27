@@ -1,0 +1,16 @@
+{
+  "books": [
+    {
+      "asin": "B0H6ZDZ2N8",
+      "marketplace": "amazon.com",
+      "title": "Leo the Crane and the Mountain Gems",
+      "enabled": true
+    }
+  ],
+  "settings": {
+    "check_frequency": "24h",
+    "notifications_enabled": true,
+    "alert_email": "author@example.com",
+    "dashboard_url": "http://localhost:8000"
+  }
+}

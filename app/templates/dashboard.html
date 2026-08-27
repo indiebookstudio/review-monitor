@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - My KDP Reviews{% endblock %}
+
+{% block content %}
+<div class="page-header" style="margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+  <div style="font-size: 0.86rem; color: var(--text-subtle); display: flex; align-items: center; gap: 6px;">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-subtle);"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+    <span>Ultimo aggiornamento: <strong style="color: #0f172a; font-weight: 700;">{{ last_update_str }}</strong></span>
+  </div>
+
+  <div class="btn-group">
+    <button type="button" class="btn btn-secondary" onclick="startLiveCheck('/books/stream-check/all', 'Controllo Globale Catalogo')" title="Aggiorna tutti i libri del catalogo">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+      Aggiorna Tutti
+    </button>
+    <button class="btn btn-primary" onclick="openModal('addBookModal')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+      Aggiungi Libro
+    </button>
+  </div>
+</div>
+
+{% if request.query_params.get('msg') %}
+<div class="alert-banner alert-success">
+  <span>✓ {{ request.query_params.get('msg') }}</span>
+</div>
+{% endif %}
+
+{% if request.query_params.get('error') %}
+<div class="alert-banner alert-error">
+  <span>⚠️ {{ request.query_params.get('error') }}</span>
+</div>
+{% endif %}
+
+<!-- Modern SaaS KPI Bar -->
+<div class="kpi-row">
+  <div class="kpi-mini-card">
+    <div>
+      <div class="kpi-mini-label">Libri Monitorati</div>
+      <div class="kpi-mini-val">{{ kpis.total_books }}</div>
+    </div>
+    <div class="kpi-icon-wrap">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+    </div>
+  </div>
+
+  <div class="kpi-mini-card">
+    <div>
+      <div class="kpi-mini-label">Recensioni Totali</div>
+      <div class="kpi-mini-val" style="color: var(--primary);">{{ kpis.total_reviews }}</div>
+    </div>
+    <div class="kpi-icon-wrap" style="color: var(--primary);">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+    </div>
+  </div>
+
+  <div class="kpi-mini-card">
+    <div>
+      <div class="kpi-mini-label">Rating Medio</div>
+      <div class="kpi-mini-val">
+        {{ kpis.avg_rating }}
+        <span style="color: #f59e0b; font-size: 1.1rem;">★</span>
+      </div>
+    </div>
+    <div class="kpi-icon-wrap" style="color: #f59e0b;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+    </div>
+  </div>
+
+  <div class="kpi-mini-card">
+    <div>
+      <div class="kpi-mini-label">Nuove (30 gg)</div>
+      <div class="kpi-mini-val" style="color: var(--success);">+{{ kpis.new_reviews_30d }}</div>
+    </div>
+    <div class="kpi-icon-wrap" style="color: var(--success);">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+    </div>
+  </div>
+</div>
+
+<!-- Marketplace Switcher Tabs (Flag Image + Code + Circular Badge) -->
+<div class="marketplace-tabs" style="margin-bottom: 16px;">
+  {% for domain, meta in mkt_stats.items() %}
+    <a href="/?marketplace={{ domain }}" class="marketplace-tab {% if selected_marketplace == domain %}active{% endif %}" title="{{ meta.name }} ({{ domain }})">
+      <img src="https://flagcdn.com/24x18/{{ meta.country }}.png" width="16" height="12" alt="{{ meta.code }}" class="mkt-flag-img" loading="eager" />
+      <span class="mkt-code">{{ meta.code }}</span>
+      <span class="mkt-count-badge">{{ meta.review_count }}</span>
+    </a>
+  {% endfor %}
+</div>
+
+<!-- Main Books Table -->
+<div class="main-card">
+  <div class="card-header-clean">
+    <h2 style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 6px;">
+      <span>{{ selected_marketplace }}</span>
+    </h2>
+  </div>
+
+  {% if books_summary and books_summary|length > 0 %}
+  <div class="table-container">
+    <table class="dashboard-table sortable-table" style="width: 100%; table-layout: auto;">
+      <thead>
+        <tr>
+          <th style="width: 36px; text-align: center;">#</th>
+          <th class="sortable-th" data-sort-type="string" style="min-width: 240px;">Copertina &amp; Titolo</th>
+          <th class="sortable-th" data-sort-type="string" style="width: 90px;">ASIN</th>
+          <th class="sortable-th" data-sort-type="string" style="width: 75px; text-align: center;">Prezzo</th>
+          <th class="sortable-th" data-sort-type="number" style="text-align: center; width: 75px;">Rec.</th>
+          <th class="sortable-th" data-sort-type="number" style="text-align: center; width: 65px;">Rating</th>
+          <th class="sortable-th" data-sort-type="number" style="text-align: center; width: 60px;">+30g</th>
+          <th class="sortable-th" data-sort-type="date" style="width: 75px; text-align: center;">Ultima</th>
+          <th style="width: 135px; text-align: right;">Azioni</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in books_summary %}
+        <tr>
+          <!-- Numero Progressivo Fisso -->
+          <td class="static-row-num" style="font-size: 0.85rem; font-weight: 700; color: var(--text-subtle); text-align: center;">
+            {{ loop.index }}
+          </td>
+
+          <!-- Copertina & Titolo (Apre su Amazon in nuova scheda) -->
+          <td data-sort-val="{{ item.title }}">
+            <div class="book-cover-cell">
+              <a href="{{ item.product_url }}" target="_blank" rel="noopener noreferrer" class="book-thumb-wrapper" title="Apri scheda su {{ selected_marketplace }}">
+                {% if item.cover_image_url %}
+                  <img src="{{ item.cover_image_url }}" alt="Cover" class="book-thumb-img" loading="lazy" />
+                {% else %}
+                  <div class="book-thumb-fallback">📖</div>
+                {% endif %}
+              </a>
+              <div style="flex: 1; min-width: 0;">
+                <a href="{{ item.product_url }}" target="_blank" rel="noopener noreferrer" class="book-title-link" title="Apri scheda su {{ selected_marketplace }}">
+                  {{ item.title }}
+                </a>
+                <div style="font-size: 0.76rem; color: var(--text-subtle); margin-top: 2px;">
+                  14 marketplace monitorati
+                </div>
+              </div>
+            </div>
+          </td>
+
+          <!-- ASIN (Non cliccabile) -->
+          <td style="font-family: ui-monospace, monospace; font-size: 0.84rem; font-weight: 700; color: var(--text-main); user-select: all;" data-sort-val="{{ item.asin }}">
+            {{ item.asin }}
+          </td>
+
+          <!-- Prezzo Cartaceo -->
+          <td style="text-align: center;" data-sort-val="{{ item.price or '0' }}">
+            {% if item.price %}
+              <span class="price-tag" style="font-size: 0.82rem;">{{ item.price }}</span>
+            {% else %}
+              <span style="color: var(--text-subtle); font-size: 0.82rem;">—</span>
+            {% endif %}
+          </td>
+
+          <!-- Recensioni Totali (Apre popup recensioni) -->
+          <td style="text-align: center;" data-sort-val="{{ item.total_reviews }}">
+            <button type="button" 
+                    class="reviews-pill {% if item.total_reviews > 0 %}has-reviews{% endif %}" 
+                    style="padding: 3px 8px; font-size: 0.85rem; cursor: pointer; border: none; font-weight: 700;" 
+                    data-book-id="{{ item.primary_book.id }}"
+                    data-title="{{ item.title }}"
+                    onclick="openBookReviewsModal(this.dataset.bookId, this.dataset.title)"
+                    title="Visualizza recensioni">
+              💬 {{ item.total_reviews }}
+            </button>
+          </td>
+
+          <!-- Rating Medio -->
+          <td style="text-align: center;" data-sort-val="{{ item.avg_rating }}">
+            <button type="button" 
+                    style="background: none; border: none; cursor: pointer; padding: 0;"
+                    data-book-id="{{ item.primary_book.id }}"
+                    data-title="{{ item.title }}"
+                    onclick="openBookReviewsModal(this.dataset.bookId, this.dataset.title)"
+                    title="Visualizza recensioni">
+              {% if item.total_reviews > 0 %}
+                <span class="stars-rating" style="font-size: 0.88rem;">{{ item.avg_rating }} ★</span>
+              {% else %}
+                <span style="color: var(--text-subtle); font-size: 0.82rem;">-</span>
+              {% endif %}
+            </button>
+          </td>
+
+          <!-- Nuove 30gg -->
+          <td style="text-align: center;" data-sort-val="{{ item.reviews_30d }}">
+            {% if item.reviews_30d > 0 %}
+              <span class="badge badge-success" style="font-size: 0.78rem; padding: 2px 6px;">+{{ item.reviews_30d }}</span>
+            {% else %}
+              <span style="color: var(--text-subtle); font-size: 0.82rem;">0</span>
+            {% endif %}
+          </td>
+
+          <!-- Data Ultima Recensione -->
+          <td style="font-size: 0.8rem; color: var(--text-muted); text-align: center; white-space: nowrap;" data-sort-val="{{ item.last_review_date }}">
+            {{ item.last_review_date }}
+          </td>
+
+          <!-- Azioni -->
+          <td style="text-align: right; white-space: nowrap; padding: 8px;">
+            <div class="btn-group" style="justify-content: flex-end; gap: 4px;">
+              <button type="button" 
+                      class="btn btn-secondary btn-sm" 
+                      style="padding: 3px 8px; font-size: 0.78rem;" 
+                      data-asin="{{ item.asin }}"
+                      onclick="startLiveCheck('/books/stream-check/asin/' + this.dataset.asin, 'Aggiornamento ASIN ' + this.dataset.asin)" 
+                      title="Aggiorna metadati e recensioni">
+                Aggiorna
+              </button>
+
+              <button type="button" 
+                      class="btn btn-secondary btn-sm" 
+                      style="padding: 3px 8px; font-size: 0.78rem; color: var(--warning);" 
+                      data-book-id="{{ item.primary_book.id }}"
+                      data-title="{{ item.title }}"
+                      data-asin="{{ item.asin }}"
+                      onclick="openResetBookModal(this.dataset.bookId, this.dataset.title, this.dataset.asin, true)" 
+                      title="Azzera recensioni salvate">
+                Reset
+              </button>
+
+              <button type="button" 
+                      class="btn btn-danger btn-sm" 
+                      style="padding: 3px 8px; font-size: 0.78rem;" 
+                      data-asin="{{ item.asin }}"
+                      data-title="{{ item.title }}"
+                      onclick="openDeleteAllStoresModal(this.dataset.asin, this.dataset.title)" 
+                      title="Elimina da tutti i marketplace">
+                ✕
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="text-align: center; padding: 60px 20px;">
+    <h3 style="font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 8px;">Nessun libro trovato per {{ selected_marketplace }}</h3>
+    <p style="color: var(--text-subtle); font-size: 0.9rem; margin-bottom: 20px;">
+      Inserisci un ASIN per monitorare le recensioni.
+    </p>
+    <button class="btn btn-primary" onclick="openModal('addBookModal')">+ Aggiungi Libro</button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Modal Aggiungi Libro (Pulito e Diretto) -->
+<div class="modal-overlay" id="addBookModal">
+  <div class="modal-content" style="max-width: 580px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Aggiungi Libro KDP</h3>
+      <button class="modal-close" onclick="closeModal('addBookModal')">&times;</button>
+    </div>
+    <form action="/books/add" method="POST" id="addBookForm">
+      <input type="hidden" name="title" id="hidden_title">
+      <input type="hidden" name="cover_image_url" id="hidden_cover_image_url">
+      <input type="hidden" name="price" id="hidden_price">
+      <input type="hidden" name="has_kindle" id="hidden_has_kindle">
+      <input type="hidden" name="kindle_price" id="hidden_kindle_price">
+      <input type="hidden" name="selected_marketplaces" id="hidden_selected_marketplaces" value="all">
+
+      <div class="form-group">
+        <label for="asin" class="form-label">Codice ASIN Amazon (o link):</label>
+        <div style="display: flex; gap: 8px;">
+          <input 
+            type="text" 
+            id="asin" 
+            name="asin" 
+            class="form-control" 
+            placeholder="es. B0H6MN4LW7" 
+            required 
+            maxlength="100"
+            style="font-size: 1.1rem; font-weight: 700; letter-spacing: 0.5px;"
+            autofocus
+          >
+          <button type="button" class="btn btn-secondary" id="scanAsinBtn" style="white-space: nowrap; font-weight: 600;">
+            Cerca
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Loading State Animation -->
+      <div class="scanner-status-box" id="scannerStatusBox">
+        <div style="display: flex; align-items: center; gap: 10px; font-size: 0.9rem; font-weight: 600; color: #0284c7;">
+          <span>Ricerca e rilevamento marketplace in corso...</span>
+        </div>
+        <div class="scanner-progress-bar">
+          <div class="scanner-progress-bar-fill"></div>
+        </div>
+      </div>
+
+      <!-- Live Downloaded Metadata Preview Card -->
+      <div class="scan-result-card" id="scanResultCard">
+        <div style="display: flex; gap: 16px; align-items: flex-start;">
+          <div class="book-thumb-wrapper" style="width: 70px; height: 95px;">
+            <img id="previewCoverImg" src="" alt="Copertina" class="book-thumb-img" style="display: none;" />
+            <div id="previewCoverFallback" class="book-thumb-fallback" style="font-size: 2rem; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">📖</div>
+          </div>
+          <div style="flex: 1;">
+            <div id="previewTitle" style="font-size: 0.96rem; font-weight: 700; color: #0f172a; margin-bottom: 8px; line-height: 1.35;"></div>
+            <div style="font-size: 0.8rem; color: var(--text-subtle); font-weight: 600; margin-bottom: 6px;">
+              Marketplace Rilevati e Prezzi:
+            </div>
+            <div class="marketplaces-grid" id="previewMarketplacesList"></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addBookModal')">Annulla</button>
+        <button type="submit" class="btn btn-primary" id="addBookSubmitBtn" style="padding: 10px 22px; font-weight: 700;">Aggiungi in Tabella</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Conferma Reset Recensioni -->
+<div class="modal-overlay" id="resetBookModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 class="modal-title" style="color: var(--danger);">Conferma Reset Recensioni</h3>
+      <button class="modal-close" onclick="closeModal('resetBookModal')">&times;</button>
+    </div>
+    <form id="resetBookForm" method="POST">
+      <p id="resetBookTitle" style="margin-bottom: 16px; color: var(--text-main); font-size: 0.95rem; line-height: 1.5;"></p>
+      
+      <div style="background: var(--warning-bg); border: 1px solid var(--warning-border); border-left: 4px solid var(--warning); padding: 12px; margin-bottom: 20px; font-size: 0.88rem; color: #b45309; border-radius: 6px;">
+        Le recensioni salvate per questo titolo verranno azzerate. Potrai poi riscaricarle con il comando <strong>Aggiorna</strong>.
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('resetBookModal')">Annulla</button>
+        <button type="submit" class="btn btn-danger">Azzera Recensioni</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
