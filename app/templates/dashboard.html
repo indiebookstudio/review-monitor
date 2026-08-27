@@ -4,9 +4,16 @@
 
 {% block content %}
 <div class="page-header" style="margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-  <div style="font-size: 0.86rem; color: var(--text-subtle); display: flex; align-items: center; gap: 6px;">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-subtle);"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-    <span>Ultimo aggiornamento: <strong style="color: #0f172a; font-weight: 700;">{{ last_update_str }}</strong></span>
+  <div style="font-size: 0.86rem; color: var(--text-subtle); display: flex; align-items: center; flex-wrap: wrap; gap: 14px;">
+    <div style="display: flex; align-items: center; gap: 5px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-subtle);"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+      <span>Ultimo controllo: <strong style="color: #0f172a; font-weight: 700;">{{ last_update_str }}</strong></span>
+    </div>
+    <span style="color: #cbd5e1;">•</span>
+    <div style="display: flex; align-items: center; gap: 5px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14"></path><path d="M5 2h14"></path><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"></path><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"></path></svg>
+      <span>Prossimo controllo: <strong style="color: #2563eb; font-weight: 700;">{{ next_update_str }}</strong> <small style="color: #64748b; font-size: 0.78rem;">(ogni {{ frequency }})</small></span>
+    </div>
   </div>
 
   <div class="btn-group">

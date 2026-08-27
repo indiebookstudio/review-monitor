@@ -82,7 +82,6 @@ async def dashboard_home(
     last_update_str = "Nessun controllo effettuato"
     if last_check_run and last_check_run.checked_at:
         try:
-            # Display localized formatted datetime (Rome / UTC+2 or local)
             dt = last_check_run.checked_at
             last_update_str = dt.strftime("%d/%m/%Y alle %H:%M")
         except Exception:
@@ -93,6 +92,23 @@ async def dashboard_home(
             last_update_str = dt.strftime("%d/%m/%Y alle %H:%M")
         except Exception:
             last_update_str = last_check_setting.value[:16].replace("T", " ")
+
+    next_update_str = "Non schedulato"
+    if next_check_setting and next_check_setting.value:
+        try:
+            dt_next = datetime.datetime.fromisoformat(next_check_setting.value)
+            next_update_str = dt_next.strftime("%d/%m/%Y alle %H:%M")
+        except Exception:
+            next_update_str = next_check_setting.value[:16].replace("T", " ")
+    elif last_check_setting and last_check_setting.value:
+        try:
+            from app.reviews.monitor import parse_frequency_hours
+            freq_hours = parse_frequency_hours(freq_setting.value if freq_setting else "24h")
+            dt_last = datetime.datetime.fromisoformat(last_check_setting.value)
+            dt_next = dt_last + datetime.timedelta(hours=freq_hours)
+            next_update_str = dt_next.strftime("%d/%m/%Y alle %H:%M")
+        except Exception:
+            pass
     
     return templates.TemplateResponse(
         request=request,
@@ -105,6 +121,7 @@ async def dashboard_home(
             "selected_marketplace": selected_marketplace,
             "last_check_run": last_check_run,
             "last_update_str": last_update_str,
+            "next_update_str": next_update_str,
             "last_check_at": last_check_setting.value if last_check_setting else None,
             "next_check_at": next_check_setting.value if next_check_setting else None,
             "frequency": freq_setting.value if freq_setting else "24h",
