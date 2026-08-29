@@ -18,7 +18,9 @@ venv.bak/
 data/*.sqlite
 *.sqlite
 *.sqlite3
-!data/reviews.db
+!data/kdp_monitor.db
+!data/*.db
+
 
 # Playwright & Browsers
 .playwright/

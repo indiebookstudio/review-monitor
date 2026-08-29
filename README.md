@@ -43,22 +43,20 @@
 
 ---
 
-## 🏗️ Architettura & Persistenza del Database
+## 🏗️ Architettura 100% GitHub-Native
 
-### Il problema di SQLite in GitHub Actions
-Nei runner di GitHub Actions, il filesystem è **effimero**: qualsiasi file SQLite creato durante un'esecuzione viene distrutto al termine del job e non è disponibile per il giorno successivo.
+Questa applicazione è progettata per funzionare in modo **completamente autonomo e senza server esterni (No Render, No PaaS)** sfruttando esclusivamente l'ecosistema GitHub:
 
-### La soluzione adottata
-Questa applicazione utilizza **SQLAlchemy agnostico**:
-- **Sviluppo Locale**: utilizza SQLite (`sqlite:///./data/kdp_monitor.db`).
-- **Produzione / GitHub Actions**: si collega a un database **PostgreSQL persistente** gratuito tramite la variabile d'ambiente `DATABASE_URL`.
+1. **Persistenza su Git**: Il database SQLite (`data/kdp_monitor.db`) è tracciato e versionato direttamente nel repository.
+2. **Automazione Notturna (GitHub Actions)**:
+   - Ogni notte alle **03:00 UTC** (04:00/05:00 ora italiana), GitHub Actions esegue automaticamente la scansione di tutti i libri su Amazon.
+   - Può essere eseguito anche manualmente su richiesta (pulsante **Run workflow** su GitHub o da app mobile).
+3. **Notifiche Email al Mattino**:
+   - Invia una notifica consolidata via email con tutte le nuove recensioni trovate (stelle, testo, autore, link Amazon).
+   - Se non ci sono nuove recensioni, invia un report di riepilogo "Heartbeat" a conferma del corretto funzionamento del controllo.
+4. **Auto-Commit e Push**:
+   - Al termine della scansione, GitHub Actions effettua il commit e il push automatico di `data/kdp_monitor.db`, garantendo la persistenza continua dello storico senza costi e senza database esterni.
 
-Puoi creare un database PostgreSQL persistente gratuito (con free tier a vita) in 2 minuti su:
-- [Supabase](https://supabase.com) (consigliato: gratuito, 500MB di storage, PostgreSQL standard)
-- [Neon](https://neon.tech) (serverless PostgreSQL gratuito)
-- [Render](https://render.com) (PostgreSQL gratuito)
-
-Tutti i client (la Dashboard web, i job GitHub Actions e gli script CLI) leggono e scrivono sullo **stesso database persistente**.
 
 ---
 
@@ -210,40 +208,20 @@ git push -u origin main
 
 ---
 
-## 🔑 GitHub Secrets Necessari per le GitHub Actions
-
-Nel tuo repository GitHub, vai su **Settings** &rarr; **Secrets and variables** &rarr; **Actions** &rarr; **New repository secret** e aggiungi:
+## 🔑 GitHub Secrets per le Notifiche Email
+ 
+Nel tuo repository GitHub, vai su **Settings** &rarr; **Secrets and variables** &rarr; **Actions** &rarr; **New repository secret** e configura:
 
 | Nome Secret | Descrizione | Esempio |
 | :--- | :--- | :--- |
-| `DATABASE_URL` | Stringa di connessione PostgreSQL persistente | `postgresql://user:pass@ep-xyz.aws.neon.tech/kdp_db?sslmode=require` |
-| `APP_SECRET_KEY` | Chiave crittografica per le sessioni | Stringa casuale di 32+ caratteri |
-| `ADMIN_PASSWORD_HASH` | (Opzionale) Hash bcrypt della password admin | Generato automaticamente o via script CLI |
-| `SMTP_HOST` | Host SMTP | `smtp.gmail.com` |
-| `SMTP_PORT` | Porta SMTP | `587` |
-| `SMTP_USER` | Il tuo indirizzo Gmail | `autore@gmail.com` |
+| `SMTP_USER` | Il tuo indirizzo Gmail | `saluccimarco@gmail.com` |
 | `SMTP_PASSWORD` | Gmail App Password (16 caratteri) | `abcd efgh ijkl mnop` |
-| `ALERT_EMAIL` | Indirizzo email destinatario degli alert | `notifiche@miodominio.com` |
-| `NOTIFICATIONS_ENABLED` | Abilita o disabilita notifiche email | `true` |
-| `DASHBOARD_URL` | URL pubblico della dashboard per il pulsante | `https://kdp-dashboard.onrender.com` |
-| `USE_PLAYWRIGHT_FALLBACK` | Fallback Playwright headless | `false` (o `true` se desiderato) |
+| `ALERT_EMAIL` | Indirizzo email su cui ricevere i report | `saluccimarco@gmail.com` |
+| `SMTP_HOST` | (Opzionale) Host SMTP | `smtp.gmail.com` (default) |
+| `SMTP_PORT` | (Opzionale) Porta SMTP | `587` (default) |
 
 ---
 
-## 🌐 Guida al Deploy Gratuito della Dashboard
-
-Puoi ospitare la dashboard gratuitamente su qualsiasi piattaforma PaaS:
-
-### Opzione 1: Render.com (Consigliata)
-1. Registrati gratuitamente su [Render.com](https://render.com).
-2. Crea un **New Web Service** collegando il tuo repository GitHub.
-3. Seleziona **Python 3**.
-4. Imposta come **Build Command**: `pip install -r requirements.txt`
-5. Imposta come **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-6. Nella sezione **Environment Variables**, aggiungi le variabili (`DATABASE_URL`, `APP_SECRET_KEY`, `ADMIN_PASSWORD`, `SMTP_USER`, `SMTP_PASSWORD`, `ALERT_EMAIL`, `DASHBOARD_URL`).
-7. Fai clic su **Create Web Service**. Render fornirà un URL HTTPS gratuito (es. `https://kdp-dashboard.onrender.com`).
-
----
 
 ## 📖 Istruzioni d'Uso della Dashboard
 

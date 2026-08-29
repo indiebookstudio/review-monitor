@@ -12,18 +12,28 @@ from app.models import AppSetting
 logger = logging.getLogger(__name__)
 
 def get_setting(db: Optional[Session], key: str, default: Any = None) -> Any:
+    # Priority 1: Check environment / settings if explicitly provided
+    env_attr = key.upper()
+    if hasattr(settings, env_attr):
+        env_val = getattr(settings, env_attr)
+        if env_val is not None and str(env_val).strip() != "":
+            if isinstance(default, bool):
+                return str(env_val).lower() in ("true", "1", "yes")
+            return env_val
+
+    # Priority 2: Database AppSetting
     if db is not None:
         s = db.query(AppSetting).filter(AppSetting.key == key).first()
-        if s and s.value is not None:
+        if s and s.value is not None and str(s.value).strip() != "":
             if isinstance(default, bool):
-                return s.value.lower() in ("true", "1", "yes")
+                return str(s.value).lower() in ("true", "1", "yes")
             return s.value
-    attr_map = {
-        "alert_email": settings.ALERT_EMAIL,
-        "notifications_enabled": settings.NOTIFICATIONS_ENABLED,
-        "dashboard_url": settings.DASHBOARD_URL,
-    }
-    return attr_map.get(key, default)
+
+    # Priority 3: Fallback default
+    if key == "dashboard_url" and (default is None or default == "" or "localhost" in str(default)):
+        return "https://github.com/indiebookstudio/review-monitor"
+    return default
+
 
 def format_stars(rating: float) -> str:
     full_stars = int(round(rating))
@@ -61,7 +71,40 @@ def send_zeroconfig_email(to_email: str, subject: str, body_text: str, extra_dat
         logger.error(f"Email dispatch error: {e}")
         return False, f"Errore invio email: {str(e)}"
 
+def send_resend_email(to_email: str, subject: str, body_text: str, body_html: str, api_key: str) -> Tuple[bool, Optional[str]]:
+    try:
+        url = "https://api.resend.com/emails"
+        headers = {
+            "Authorization": f"Bearer {api_key.strip()}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "from": "KDP Review Monitor <onboarding@resend.dev>",
+            "to": [to_email.strip()],
+            "subject": subject,
+            "text": body_text,
+            "html": body_html
+        }
+        resp = requests.post(url, headers=headers, json=payload, timeout=20)
+        if resp.status_code in (200, 201):
+            logger.info(f"Resend email sent successfully to {to_email}")
+            return True, None
+        else:
+            logger.warning(f"Resend API returned HTTP {resp.status_code}: {resp.text}")
+            return False, f"Resend error: {resp.text}"
+    except Exception as e:
+        logger.error(f"Resend error: {e}")
+        return False, str(e)
+
 def send_smtp_email(to_email: str, subject: str, body_text: str, body_html: str, db: Optional[Session] = None, extra_data: Optional[Dict[str, Any]] = None) -> Tuple[bool, Optional[str]]:
+    import os
+    resend_key = get_setting(db, "resend_api_key", os.environ.get("RESEND_API_KEY", ""))
+    if resend_key and str(resend_key).strip():
+        success, err = send_resend_email(to_email, subject, body_text, body_html, str(resend_key))
+        if success:
+            return True, None
+        logger.warning(f"Resend failed ({err}), falling back...")
+
     smtp_host = get_setting(db, "smtp_host", settings.SMTP_HOST)
     smtp_port = int(get_setting(db, "smtp_port", settings.SMTP_PORT) or 587)
     smtp_user = get_setting(db, "smtp_user", settings.SMTP_USER)
@@ -74,6 +117,7 @@ def send_smtp_email(to_email: str, subject: str, body_text: str, body_html: str,
     if not smtp_user or not smtp_pass:
         logger.info(f"Using Cloud Dispatcher for {to_email}...")
         return send_zeroconfig_email(to_email, subject, body_text, extra_data)
+
 
     try:
         msg = MIMEMultipart("alternative")

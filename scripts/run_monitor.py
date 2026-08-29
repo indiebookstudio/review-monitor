@@ -12,7 +12,9 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
+from app.config import settings
 from app.database import engine, Base, SessionLocal
+from app.models import AppSetting
 from app.reviews.monitor import run_all_checks
 
 logging.basicConfig(
@@ -35,11 +37,35 @@ def main():
 
     db = SessionLocal()
     try:
+        # Sync environment variables into DB settings if provided
+        for env_attr, setting_key in [
+            ("ALERT_EMAIL", "alert_email"),
+            ("RESEND_API_KEY", "resend_api_key"),
+            ("SMTP_HOST", "smtp_host"),
+            ("SMTP_PORT", "smtp_port"),
+            ("SMTP_USER", "smtp_user"),
+            ("SMTP_PASSWORD", "smtp_password"),
+            ("DASHBOARD_URL", "dashboard_url"),
+        ]:
+
+            val = getattr(settings, env_attr, None)
+            if val is not None and str(val).strip() != "":
+                s = db.query(AppSetting).filter(AppSetting.key == setting_key).first()
+                if s:
+                    s.value = str(val)
+                else:
+                    db.add(AppSetting(key=setting_key, value=str(val)))
+        db.commit()
+
         logger.info(f"Starting review check (force={args.force})...")
         report = run_all_checks(db, force=args.force)
         
         if report.get("executed"):
-            logger.info(f"Check finished: {report.get('books_checked')} books checked, {report.get('total_new_reviews')} new reviews found.")
+            logger.info(
+                f"Check finished: {report.get('books_checked')} books checked, "
+                f"{report.get('total_new_reviews')} new reviews found, "
+                f"{report.get('total_emails_sent', 0)} email(s) sent."
+            )
         else:
             logger.info(f"Check skipped: {report.get('reason')}")
             
@@ -48,6 +74,7 @@ def main():
         sys.exit(1)
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     main()
