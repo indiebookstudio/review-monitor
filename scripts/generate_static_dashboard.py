@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Generates a standalone, ultra-fast, mobile-responsive HTML dashboard
-for GitHub Pages from the SQLite database.
+Generates the clean, table-based, sortable KDP dashboard for GitHub Pages
+with marketplace switcher bar and sortable columns.
 Outputs to docs/index.html.
 """
 import os
@@ -13,11 +13,10 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
-from app.database import SessionLocal, engine, Base
-from app.models import Book, Review, CheckRun, AppSetting
-from app.reviews.statistics import get_dashboard_kpis
-from sqlalchemy import func
-
+from app.database import SessionLocal
+from app.models import Book, Review
+from app.reviews.statistics import get_dashboard_kpis, format_compact_date
+from app.amazon.marketplace import MARKETPLACES
 
 def format_stars(rating: float) -> str:
     full = int(round(rating or 5.0))
@@ -28,448 +27,891 @@ def generate_static_html(output_path: Path) -> str:
     db = SessionLocal()
     try:
         books = db.query(Book).filter(Book.enabled == True).all()
-        reviews = db.query(Review).order_by(Review.first_seen_at.desc(), Review.id.desc()).all()
-        stats = get_dashboard_kpis(db)
-
-        
-        # Group books by ASIN
-        asins_map = {}
-        for b in books:
-            if b.asin not in asins_map:
-                asins_map[b.asin] = {
-                    "asin": b.asin,
-                    "title": b.title,
-                    "cover_image_url": b.cover_image_url or "https://via.placeholder.com/180x260?text=No+Cover",
-                    "price": b.price or "",
-                    "has_kindle": b.has_kindle,
-                    "kindle_price": b.kindle_price or "",
-                    "marketplaces": [],
-                    "reviews_count": 0,
-                    "avg_rating": 0.0,
-                    "ratings": []
-                }
-            if b.marketplace not in asins_map[b.asin]["marketplaces"]:
-                asins_map[b.asin]["marketplaces"].append(b.marketplace)
-            if not asins_map[b.asin]["title"] or asins_map[b.asin]["title"].startswith("Amazon KDP"):
-                if b.title:
-                    asins_map[b.asin]["title"] = b.title
-            if not asins_map[b.asin]["cover_image_url"] or "placeholder" in asins_map[b.asin]["cover_image_url"]:
-                if b.cover_image_url:
-                    asins_map[b.asin]["cover_image_url"] = b.cover_image_url
-            if not asins_map[b.asin]["price"] and b.price:
-                asins_map[b.asin]["price"] = b.price
-            if b.has_kindle:
-                asins_map[b.asin]["has_kindle"] = True
-                if b.kindle_price and not asins_map[b.asin]["kindle_price"]:
-                    asins_map[b.asin]["kindle_price"] = b.kindle_price
-
-        # Aggregate reviews per ASIN
-        for r in reviews:
-            if r.asin in asins_map:
-                asins_map[r.asin]["reviews_count"] += 1
-                if r.rating is not None:
-                    asins_map[r.asin]["ratings"].append(r.rating)
-
-        for asin_data in asins_map.values():
-            if asin_data["ratings"]:
-                asin_data["avg_rating"] = round(sum(asin_data["ratings"]) / len(asin_data["ratings"]), 1)
-            else:
-                asin_data["avg_rating"] = 5.0
-
-        # Star distribution
-        rating_counts = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0}
-        for r in reviews:
-            val = int(round(r.rating or 5.0))
-            val = max(1, min(5, val))
-            rating_counts[val] += 1
-        
-        tot_revs = len(reviews)
-        star_pcts = {
-            s: round((rating_counts[s] / tot_revs * 100), 1) if tot_revs > 0 else 0
-            for s in range(1, 6)
-        }
-
+        reviews = db.query(Review).all()
+        kpis = get_dashboard_kpis(db)
         now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%d/%m/%Y alle %H:%M UTC")
 
-        # Serialized JSON for dynamic search / filter on client side
-        books_json = json.dumps(list(asins_map.values()))
-        reviews_json = json.dumps([
-            {
-                "id": r.id,
-                "asin": r.asin,
-                "book_title": asins_map.get(r.asin, {}).get("title", r.asin),
-                "marketplace": r.marketplace,
-                "rating": r.rating or 5.0,
-                "stars": format_stars(r.rating or 5.0),
-                "title": r.title or "Recensione",
-                "body": r.body or "",
-                "author": r.author or "Cliente Amazon",
-                "review_date": r.review_date or "",
-                "review_url": r.review_url or f"https://www.{r.marketplace}/dp/{r.asin}",
-                "first_seen_at": r.first_seen_at.strftime("%d/%m/%Y") if r.first_seen_at else ""
+        # Marketplace stats
+        mkt_counts = {}
+        for mkt_key, meta in MARKETPLACES.items():
+            mkt_counts[mkt_key] = {
+                "name": meta.get("name", mkt_key),
+                "code": meta.get("code", mkt_key),
+                "country": meta.get("country", "it"),
+                "flag": meta.get("flag", "🌐"),
+                "count": 0
             }
-            for r in reviews
-        ])
+
+        # Index reviews by book_id
+        reviews_by_book = {}
+        for r in reviews:
+            reviews_by_book.setdefault(r.book_id, []).append(r)
+            if r.marketplace in mkt_counts:
+                mkt_counts[r.marketplace]["count"] += 1
+
+        # Build table rows data
+        now_dt = datetime.datetime.now(datetime.timezone.utc)
+        d30 = now_dt - datetime.timedelta(days=30)
+
+        table_rows = []
+        for b in books:
+            b_revs = reviews_by_book.get(b.id, [])
+            rev_count = len(b_revs)
+            
+            # Avg rating
+            ratings = [r.rating for r in b_revs if r.rating is not None]
+            avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else (5.0 if rev_count > 0 else 0.0)
+            
+            # Reviews in last 30d
+            new_30d = sum(1 for r in b_revs if r.first_seen_at and r.first_seen_at.replace(tzinfo=datetime.timezone.utc) >= d30)
+            
+            # Last review date
+            last_date = "-"
+            if b_revs:
+                # get newest review
+                sorted_revs = sorted(b_revs, key=lambda x: x.first_seen_at or datetime.datetime.min, reverse=True)
+                if sorted_revs and sorted_revs[0].review_date:
+                    last_date = sorted_revs[0].review_date
+
+            m_meta = MARKETPLACES.get(b.marketplace, {})
+            country = m_meta.get("country", "it")
+            mkt_code = m_meta.get("code", b.marketplace.replace("amazon.", "").upper())
+
+            serialized_revs = [
+                {
+                    "id": r.review_id,
+                    "rating": r.rating or 5.0,
+                    "stars": format_stars(r.rating or 5.0),
+                    "title": r.title or "Recensione",
+                    "author": r.author or "Cliente Amazon",
+                    "date": r.review_date or "",
+                    "body": r.body or "",
+                    "url": r.review_url or f"https://www.{b.marketplace}/dp/{b.asin}"
+                }
+                for r in b_revs
+            ]
+
+            table_rows.append({
+                "id": b.id,
+                "asin": b.asin,
+                "title": b.title or f"Libro {b.asin}",
+                "cover": b.cover_image_url or "",
+                "marketplace": b.marketplace,
+                "mkt_code": mkt_code,
+                "country": country,
+                "price": b.price or "",
+                "has_kindle": b.has_kindle,
+                "kindle_price": b.kindle_price or "",
+                "reviews_count": rev_count,
+                "avg_rating": avg_rating,
+                "new_30d": new_30d,
+                "last_date": last_date,
+                "product_url": f"https://www.{b.marketplace}/dp/{b.asin}",
+                "reviews": serialized_revs
+            })
+
+        table_rows_json = json.dumps(table_rows)
+        mkt_counts_json = json.dumps(mkt_counts)
 
         html_content = f"""<!DOCTYPE html>
-<html lang="it" class="h-full bg-slate-950 text-slate-100">
+<html lang="it">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KDP Review Monitor &mdash; Live Dashboard</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {{
-      darkMode: 'class',
-      theme: {{
-        extend: {{
-          colors: {{
-            brand: {{ 50: '#f0fdf4', 500: '#22c55e', 600: '#16a34a' }},
-            accent: {{ 500: '#f59e0b', 600: '#d97706' }}
-          }}
-        }}
-      }}
-    }}
-  </script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <title>KDP Review Monitor &mdash; Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  
   <style>
-    .star-amber {{ color: #f59e0b; }}
-    .glass-card {{ background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.6); }}
+    :root {{
+      --bg-page: #f8fafc;
+      --card-bg: #ffffff;
+      --border-color: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --primary: #0284c7;
+      --primary-hover: #0369a1;
+      --emerald: #10b981;
+      --amber: #f59e0b;
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.07);
+    }}
+
+    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+
+    body {{
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-page);
+      color: var(--text-main);
+      line-height: 1.5;
+      padding-bottom: 60px;
+    }}
+
+    /* Top Navbar */
+    .navbar {{
+      background: #ffffff;
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: var(--shadow-sm);
+    }}
+
+    .navbar-inner {{
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }}
+
+    .brand {{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 1.15rem;
+      color: var(--text-main);
+    }}
+
+    .brand-icon {{
+      width: 34px;
+      height: 34px;
+      background: linear-gradient(135deg, #0284c7, #0369a1);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 1.1rem;
+    }}
+
+    .status-pill {{
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid #a7f3d0;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }}
+
+    .container {{
+      max-width: 1400px;
+      margin: 20px auto;
+      padding: 0 20px;
+    }}
+
+    /* KPI Row */
+    .kpi-grid {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }}
+
+    .kpi-card {{
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px 20px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }}
+
+    .kpi-label {{
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }}
+
+    .kpi-value {{
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--text-main);
+      margin-top: 2px;
+    }}
+
+    /* Marketplace Selector Bar (Tabs with Flags) */
+    .mkt-bar {{
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 8px 12px;
+      margin-bottom: 18px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      white-space: nowrap;
+      scrollbar-width: thin;
+    }}
+
+    .mkt-tab {{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      background: #f1f5f9;
+      color: #334155;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-decoration: none;
+      flex-shrink: 0;
+    }}
+
+    .mkt-tab:hover {{
+      background: #e2e8f0;
+      color: var(--text-main);
+    }}
+
+    .mkt-tab.active {{
+      background: #0284c7;
+      color: #ffffff;
+      border-color: #0284c7;
+    }}
+
+    .mkt-flag {{
+      width: 18px;
+      height: 13px;
+      object-fit: cover;
+      border-radius: 2px;
+    }}
+
+    .mkt-badge {{
+      background: rgba(0, 0, 0, 0.08);
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+    }}
+
+    .mkt-tab.active .mkt-badge {{
+      background: rgba(255, 255, 255, 0.25);
+      color: #ffffff;
+    }}
+
+    /* Main Table Container */
+    .table-card {{
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }}
+
+    .table-toolbar {{
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      background: #ffffff;
+    }}
+
+    .table-title {{
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }}
+
+    .search-box {{
+      position: relative;
+      min-width: 280px;
+    }}
+
+    .search-box input {{
+      width: 100%;
+      padding: 7px 12px 7px 32px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 0.84rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }}
+
+    .search-box input:focus {{
+      border-color: var(--primary);
+    }}
+
+    .search-icon {{
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }}
+
+    .table-wrapper {{
+      width: 100%;
+      overflow-x: auto;
+    }}
+
+    table.kdp-table {{
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.85rem;
+    }}
+
+    table.kdp-table th {{
+      background: #f8fafc;
+      color: #475569;
+      font-weight: 700;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border-color);
+      user-select: none;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }}
+
+    table.kdp-table th:hover {{
+      background: #f1f5f9;
+      color: #0f172a;
+    }}
+
+    table.kdp-table th.no-sort {{
+      cursor: default;
+    }}
+    table.kdp-table th.no-sort:hover {{
+      background: #f8fafc;
+    }}
+
+    .sort-indicator {{
+      display: inline-block;
+      margin-left: 4px;
+      font-size: 0.75rem;
+      color: #94a3b8;
+    }}
+
+    th.sorted-asc .sort-indicator::after {{ content: ' ▲'; color: #0284c7; }}
+    th.sorted-desc .sort-indicator::after {{ content: ' ▼'; color: #0284c7; }}
+    th:not(.sorted-asc):not(.sorted-desc) .sort-indicator::after {{ content: ' ⇅'; opacity: 0.4; }}
+
+    table.kdp-table td {{
+      padding: 12px 14px;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }}
+
+    table.kdp-table tr:hover td {{
+      background: #f8fafc;
+    }}
+
+    .book-cell {{
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 280px;
+    }}
+
+    .book-cover {{
+      width: 36px;
+      height: 48px;
+      object-fit: cover;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+      background: #e2e8f0;
+      flex-shrink: 0;
+    }}
+
+    .book-title {{
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.3;
+      text-decoration: none;
+    }}
+
+    .book-title:hover {{
+      color: var(--primary);
+    }}
+
+    .asin-tag {{
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 0.8rem;
+      color: #334155;
+    }}
+
+    .price-badge {{
+      font-weight: 700;
+      color: #0f172a;
+      white-space: nowrap;
+    }}
+
+    .reviews-btn {{
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      color: #334155;
+      font-weight: 800;
+      font-size: 0.82rem;
+      border: 1px solid #e2e8f0;
+      cursor: pointer;
+      transition: all 0.15s;
+    }}
+
+    .reviews-btn.has-revs {{
+      background: #f0fdf4;
+      color: #15803d;
+      border-color: #bbf7d0;
+    }}
+
+    .reviews-btn:hover {{
+      transform: scale(1.04);
+      border-color: #0284c7;
+    }}
+
+    .rating-badge {{
+      font-weight: 800;
+      color: #d97706;
+      white-space: nowrap;
+    }}
+
+    .btn-amazon {{
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: #f8fafc;
+      border: 1px solid var(--border-color);
+      color: #0284c7;
+      font-weight: 700;
+      font-size: 0.78rem;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }}
+
+    .btn-amazon:hover {{
+      background: #0284c7;
+      color: #ffffff;
+      border-color: #0284c7;
+    }}
+
+    /* Modal for Reviews */
+    .modal-overlay {{
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }}
+
+    .modal-overlay.open {{
+      display: flex;
+    }}
+
+    .modal-box {{
+      background: #ffffff;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 680px;
+      max-height: 85vh;
+      display: flex;
+      flex-col: column;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border-color);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }}
+
+    .modal-header {{
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #f8fafc;
+    }}
+
+    .modal-title {{
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--text-main);
+    }}
+
+    .modal-close {{
+      background: none;
+      border: none;
+      font-size: 1.4rem;
+      color: #64748b;
+      cursor: pointer;
+      line-height: 1;
+    }}
+
+    .modal-body {{
+      padding: 20px;
+      overflow-y: auto;
+      flex: 1;
+    }}
+
+    .review-card {{
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-left: 4px solid #f59e0b;
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }}
+
+    .review-stars {{
+      color: #f59e0b;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }}
+
+    .review-title {{
+      font-weight: 800;
+      color: #0f172a;
+      margin: 4px 0 2px 0;
+      font-size: 0.9rem;
+    }}
+
+    .review-meta {{
+      font-size: 0.78rem;
+      color: #64748b;
+      margin-bottom: 8px;
+    }}
+
+    .review-text {{
+      font-size: 0.85rem;
+      color: #334155;
+      white-space: pre-wrap;
+      line-height: 1.45;
+    }}
   </style>
 </head>
-<body class="min-h-full flex flex-col antialiased selection:bg-emerald-500 selection:text-white pb-16">
+<body>
 
-  <!-- Navigation Bar -->
-  <header class="sticky top-0 z-40 bg-slate-900/90 backdrop-blur border-b border-slate-800">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-emerald-500 flex items-center justify-center text-slate-950 font-black text-xl shadow-lg shadow-emerald-500/10">
-          📚
-        </div>
+  <!-- Top Navbar -->
+  <nav class="navbar">
+    <div class="navbar-inner">
+      <div class="brand">
+        <div class="brand-icon">📚</div>
+        <span>KDP Review Monitor</span>
+        <span class="status-pill">● Live</span>
+      </div>
+      <div style="font-size: 0.8rem; color: var(--text-muted);">
+        Ultimo controllo: <strong style="color: #0f172a;">{now_str}</strong> &bull; Schedulazione: <span style="color: #0284c7; font-weight: 700;">Ogni notte alle 03:00 UTC</span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+
+    <!-- KPI Row -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
         <div>
-          <h1 class="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-            KDP Review Monitor
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              🟢 Live
-            </span>
-          </h1>
-          <p class="text-xs text-slate-400">Scansione notturna automatica &bull; Aggiornato {now_str}</p>
+          <div class="kpi-label">Libri Monitorati</div>
+          <div class="kpi-value">{kpis['total_books']}</div>
         </div>
+        <div style="font-size: 1.5rem;">📖</div>
       </div>
 
-      <div class="flex items-center gap-2">
-        <a href="https://github.com/indiebookstudio/review-monitor/actions" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-300 transition">
-          <i class="fa-brands fa-github"></i>
-          <span>GitHub Actions</span>
-        </a>
-      </div>
-    </div>
-  </header>
-
-  <!-- Main Content Container -->
-  <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-8">
-
-    <!-- KPI Summary Grid -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      
-      <div class="glass-card rounded-2xl p-5 relative overflow-hidden">
-        <div class="flex justify-between items-start">
-          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Libri Monitorati</span>
-          <div class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center text-sm">
-            <i class="fa-solid fa-book"></i>
-          </div>
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">Recensioni Totali</div>
+          <div class="kpi-value" style="color: var(--primary);">{kpis['total_reviews']}</div>
         </div>
-        <div class="mt-3 flex items-baseline gap-2">
-          <span class="text-3xl font-extrabold text-white">{len(asins_map)}</span>
-          <span class="text-xs text-slate-400">({len(books)} store)</span>
-        </div>
-        <div class="mt-1 text-xs text-emerald-400 font-medium">100% attivi</div>
+        <div style="font-size: 1.5rem;">💬</div>
       </div>
 
-      <div class="glass-card rounded-2xl p-5 relative overflow-hidden">
-        <div class="flex justify-between items-start">
-          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Recensioni Totali</span>
-          <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-sm">
-            <i class="fa-solid fa-comments"></i>
-          </div>
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">Rating Medio</div>
+          <div class="kpi-value" style="color: #d97706;">{kpis['avg_rating']} ★</div>
         </div>
-        <div class="mt-3 flex items-baseline gap-2">
-          <span class="text-3xl font-extrabold text-emerald-400">{tot_revs}</span>
-          <span class="text-xs text-slate-400">archiviate</span>
-        </div>
-        <div class="mt-1 text-xs text-slate-400">Su Amazon globale</div>
+        <div style="font-size: 1.5rem;">⭐</div>
       </div>
 
-      <div class="glass-card rounded-2xl p-5 relative overflow-hidden">
-        <div class="flex justify-between items-start">
-          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Rating Globale</span>
-          <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center text-sm">
-            <i class="fa-solid fa-star"></i>
-          </div>
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">Nuove (30 gg)</div>
+          <div class="kpi-value" style="color: #10b981;">+{kpis['new_reviews_30d']}</div>
         </div>
-        <div class="mt-3 flex items-baseline gap-2">
-          <span class="text-3xl font-extrabold text-amber-400">{stats.get('avg_rating', 5.0)}</span>
-          <span class="text-xs text-amber-400/80">/ 5.0 ★</span>
-        </div>
-        <div class="mt-1 text-xs text-amber-300/80 font-mono tracking-widest">{format_stars(stats.get('avg_rating', 5.0))}</div>
-      </div>
-
-      <div class="glass-card rounded-2xl p-5 relative overflow-hidden">
-        <div class="flex justify-between items-start">
-          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Prossimo Check</span>
-          <div class="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-sm">
-            <i class="fa-solid fa-moon"></i>
-          </div>
-        </div>
-        <div class="mt-3 flex items-baseline gap-2">
-          <span class="text-xl font-bold text-purple-300">03:00 UTC</span>
-        </div>
-        <div class="mt-1 text-xs text-purple-400 font-medium">Ogni notte con notifica email</div>
-      </div>
-
-    </div>
-
-    <!-- Rating Distribution & Quick Stats -->
-    <div class="glass-card rounded-2xl p-6">
-      <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
-        <i class="fa-solid fa-chart-simple text-amber-400"></i> Distribuzione Valutazioni a Stelle
-      </h2>
-      <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-        { "".join([f'''
-        <div class="bg-slate-900/60 rounded-xl p-4 border border-slate-800 flex flex-col justify-between">
-          <div class="flex items-center justify-between">
-            <span class="text-sm font-bold text-amber-400">{s} ★</span>
-            <span class="text-xs text-slate-400">{rating_counts[s]} recensioni</span>
-          </div>
-          <div class="w-full bg-slate-800 rounded-full h-2 mt-3 overflow-hidden">
-            <div class="bg-amber-400 h-2 rounded-full" style="width: {star_pcts[s]}%;"></div>
-          </div>
-          <div class="mt-2 text-right text-xs font-semibold text-slate-300">{star_pcts[s]}%</div>
-        </div>
-        ''' for s in range(5, 0, -1)]) }
+        <div style="font-size: 1.5rem;">📈</div>
       </div>
     </div>
 
-    <!-- Interactive Filter & Search Bar -->
-    <div class="glass-card rounded-2xl p-4 sm:p-5">
-      <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
-        
-        <!-- Search Input -->
-        <div class="relative w-full md:w-96">
-          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
-          <input 
-            type="text" 
-            id="searchInput" 
-            placeholder="Cerca libro, ASIN, autore o testo..." 
-            class="w-full pl-10 pr-4 py-2 bg-slate-900/80 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
-            oninput="filterData()"
-          >
-        </div>
-
-        <!-- Filter Selects -->
-        <div class="flex flex-wrap gap-2 w-full md:w-auto">
-          <select id="tabFilter" onchange="switchView(this.value)" class="px-3 py-2 bg-slate-900/80 border border-slate-700 rounded-xl text-xs font-semibold text-slate-200 focus:outline-none focus:border-emerald-500">
-            <option value="reviews">💬 Tutte le Recensioni ({tot_revs})</option>
-            <option value="books">📖 Catalogo Libri ({len(asins_map)})</option>
-          </select>
-
-          <select id="marketplaceFilter" onchange="filterData()" class="px-3 py-2 bg-slate-900/80 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
-            <option value="">🌐 Tutti i Marketplace</option>
-            <option value="amazon.it">🇮🇹 Amazon.it</option>
-            <option value="amazon.com">🇺🇸 Amazon.com</option>
-            <option value="amazon.co.uk">🇬🇧 Amazon.co.uk</option>
-            <option value="amazon.de">🇩🇪 Amazon.de</option>
-            <option value="amazon.fr">🇫🇷 Amazon.fr</option>
-            <option value="amazon.es">🇪🇸 Amazon.es</option>
-          </select>
-
-          <select id="starsFilter" onchange="filterData()" class="px-3 py-2 bg-slate-900/80 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
-            <option value="">⭐ Tutte le stelle</option>
-            <option value="5">5 Stelle (★★★★★)</option>
-            <option value="4">4 Stelle (★★★★☆)</option>
-            <option value="3">3 Stelle o meno (≤ ★★★☆☆)</option>
-          </select>
-        </div>
-
-      </div>
+    <!-- Marketplace Selector Bar (Tabs with flags) -->
+    <div class="mkt-bar" id="mktBar">
+      <button class="mkt-tab active" onclick="selectMarketplace('all', this)">
+        <span>🌐 Tutti i Marketplace</span>
+        <span class="mkt-badge">{kpis['total_reviews']}</span>
+      </button>
+      { "".join([f'''
+      <button class="mkt-tab" onclick="selectMarketplace('{mkt_key}', this)" title="{meta['name']}">
+        <img src="https://flagcdn.com/24x18/{meta['country']}.png" class="mkt-flag" alt="{meta['code']}">
+        <span>{meta['code']}</span>
+        <span class="mkt-badge">{meta['count']}</span>
+      </button>
+      ''' for mkt_key, meta in mkt_counts.items()]) }
     </div>
 
-    <!-- Section 1: Reviews Feed Container -->
-    <div id="reviewsContainer" class="space-y-4">
-      <div class="flex items-center justify-between px-1">
-        <h3 class="text-base font-bold text-white flex items-center gap-2">
-          <span>Elenco Recensioni</span>
-          <span id="reviewsCountBadge" class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-normal">
-            {tot_revs} elementi
+    <!-- Main Table Card -->
+    <div class="table-card">
+      <div class="table-toolbar">
+        <div class="table-title">
+          <span id="currentMktTitle">Tutti i Marketplace</span>
+          <span id="rowCountBadge" style="font-size: 0.78rem; background: #f1f5f9; padding: 2px 8px; border-radius: 999px; color: #475569; font-weight: 700;">
+            {len(table_rows)} libri
           </span>
-        </h3>
+        </div>
+
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="tableSearch" placeholder="Cerca per titolo, ASIN o autore..." oninput="handleSearch()">
+        </div>
       </div>
-      
-      <div id="reviewsList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <!-- Rendered dynamically by JS -->
+
+      <div class="table-wrapper">
+        <table class="kdp-table" id="booksTable">
+          <thead>
+            <tr>
+              <th class="no-sort" style="width: 40px; text-align: center;">#</th>
+              <th onclick="sortTable(1, 'string')">Copertina &amp; Titolo <span class="sort-indicator"></span></th>
+              <th onclick="sortTable(2, 'string')" style="width: 100px;">ASIN <span class="sort-indicator"></span></th>
+              <th onclick="sortTable(3, 'string')" style="width: 80px; text-align: center;">Store <span class="sort-indicator"></span></th>
+              <th onclick="sortTable(4, 'currency')" style="width: 90px; text-align: right;">Prezzo <span class="sort-indicator"></span></th>
+              <th onclick="sortTable(5, 'number')" style="width: 85px; text-align: center;">Recensioni <span class="sort-indicator"></span></th>
+              <th onclick="sortTable(6, 'number')" style="width: 85px; text-align: center;">Rating <span class="sort-indicator"></span></th>
+              <th onclick="sortTable(7, 'number')" style="width: 75px; text-align: center;">+30gg <span class="sort-indicator"></span></th>
+              <th onclick="sortTable(8, 'string')" style="width: 110px; text-align: center;">Ultima Rec. <span class="sort-indicator"></span></th>
+              <th class="no-sort" style="width: 90px; text-align: center;">Amazon</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <!-- Rendered by JS -->
+          </tbody>
+        </table>
       </div>
     </div>
 
-    <!-- Section 2: Books Catalog Container -->
-    <div id="booksContainer" class="hidden space-y-4">
-      <div class="flex items-center justify-between px-1">
-        <h3 class="text-base font-bold text-white flex items-center gap-2">
-          <span>Catalogo Libri Monitorati</span>
-          <span id="booksCountBadge" class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-normal">
-            {len(asins_map)} titoli
-          </span>
-        </h3>
-      </div>
+  </div>
 
-      <div id="booksList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        <!-- Rendered dynamically by JS -->
+  <!-- Reviews Modal -->
+  <div class="modal-overlay" id="reviewsModal" onclick="closeReviewsModal(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalBookTitle">Recensioni Libro</h3>
+        <button class="modal-close" onclick="closeReviewsModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modalReviewsList">
+        <!-- Rendered by JS -->
       </div>
     </div>
+  </div>
 
-  </main>
-
-  <!-- Footer -->
-  <footer class="mt-auto border-t border-slate-900 py-6 text-center text-xs text-slate-500">
-    <p>KDP Review Monitor &bull; 100% GitHub Actions &amp; GitHub Pages &bull; Aggiornato automaticamente ogni notte</p>
-  </footer>
-
-  <!-- Client-Side Data & Script -->
+  <!-- Client-Side Engine (Filtering, Multi-Column Sorting, Modal) -->
   <script>
-    const ALL_REVIEWS = {reviews_json};
-    const ALL_BOOKS = {books_json};
+    const RAW_ROWS = {table_rows_json};
+    let currentMkt = 'all';
+    let searchQuery = '';
+    let currentSortCol = 5; // Default sort by reviews count
+    let currentSortAsc = false; // Descending
 
-    function renderReviews(items) {{
-      const container = document.getElementById("reviewsList");
-      document.getElementById("reviewsCountBadge").innerText = items.length + " elementi";
+    function renderTable() {{
+      const tbody = document.getElementById("tableBody");
       
-      if (items.length === 0) {{
-        container.innerHTML = `
-          <div class="col-span-full py-16 text-center glass-card rounded-2xl">
-            <div class="text-4xl mb-2">🔍</div>
-            <p class="text-slate-400 text-sm font-medium">Nessuna recensione corrispondente ai filtri impostati.</p>
-          </div>
+      // Filter
+      let filtered = RAW_ROWS.filter(r => {{
+        const matchMkt = (currentMkt === 'all' || r.marketplace === currentMkt);
+        const q = searchQuery.toLowerCase().trim();
+        const matchSearch = !q || r.title.toLowerCase().includes(q) || r.asin.toLowerCase().includes(q);
+        return matchMkt && matchSearch;
+      }});
+
+      // Sort
+      filtered.sort((a, b) => {{
+        let valA, valB;
+        if (currentSortCol === 1) {{ valA = a.title; valB = b.title; }}
+        else if (currentSortCol === 2) {{ valA = a.asin; valB = b.asin; }}
+        else if (currentSortCol === 3) {{ valA = a.marketplace; valB = b.marketplace; }}
+        else if (currentSortCol === 4) {{ 
+          valA = parseFloat((a.price || '0').replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
+          valB = parseFloat((b.price || '0').replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
+        }}
+        else if (currentSortCol === 5) {{ valA = a.reviews_count; valB = b.reviews_count; }}
+        else if (currentSortCol === 6) {{ valA = a.avg_rating; valB = b.avg_rating; }}
+        else if (currentSortCol === 7) {{ valA = a.new_30d; valB = b.new_30d; }}
+        else if (currentSortCol === 8) {{ valA = a.last_date; valB = b.last_date; }}
+        else {{ valA = a.id; valB = b.id; }}
+
+        if (typeof valA === 'string') {{
+          return currentSortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        }} else {{
+          return currentSortAsc ? valA - valB : valB - valA;
+        }}
+      }});
+
+      document.getElementById("rowCountBadge").innerText = filtered.length + " libri";
+
+      if (filtered.length === 0) {{
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="10" style="text-align: center; padding: 40px 20px; color: #64748b;">
+              Nessun libro trovato per i filtri selezionati.
+            </td>
+          </tr>
         `;
         return;
       }}
 
-      container.innerHTML = items.map(r => `
-        <div class="glass-card rounded-2xl p-5 flex flex-col justify-between hover:border-slate-600 transition">
-          <div>
-            <div class="flex items-start justify-between gap-3 mb-2">
+      tbody.innerHTML = filtered.map((r, idx) => `
+        <tr>
+          <td style="text-align: center; font-weight: 700; color: #94a3b8;">${{idx + 1}}</td>
+          
+          <td>
+            <div class="book-cell">
+              <img src="${{r.cover || 'https://via.placeholder.com/36x48?text=KDP'}}" alt="Cover" class="book-cover" onerror="this.src='https://via.placeholder.com/36x48?text=KDP'">
               <div>
-                <span class="text-amber-400 font-mono tracking-wider font-bold text-sm">${{r.stars}}</span>
-                <span class="text-xs font-bold text-slate-300 ml-1.5">${{r.rating}}/5</span>
+                <a href="${{r.product_url}}" target="_blank" class="book-title" title="${{r.title}}">${{r.title}}</a>
+                <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">Store: ${{r.marketplace}}</div>
               </div>
-              <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
-                ${{r.marketplace}}
-              </span>
             </div>
+          </td>
 
-            <h4 class="font-bold text-slate-100 text-sm mb-1 line-clamp-1">${{r.title}}</h4>
-            <div class="text-[11px] text-slate-400 mb-3">
-              Recensito da <strong class="text-slate-300">${{r.author}}</strong> ${{r.review_date ? 'il ' + r.review_date : ''}}
-            </div>
+          <td><span class="asin-tag">${{r.asin}}</span></td>
 
-            <p class="text-xs text-slate-300/90 whitespace-pre-wrap leading-relaxed mb-4">${{r.body}}</p>
-          </div>
-
-          <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
-            <span class="text-slate-400 font-medium truncate max-w-[200px]" title="${{r.book_title}}">
-              📖 ${{r.book_title}}
+          <td style="text-align: center;">
+            <span style="display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: 0.78rem;">
+              <img src="https://flagcdn.com/24x18/${{r.country}}.png" class="mkt-flag" alt="${{r.mkt_code}}">
+              ${{r.mkt_code}}
             </span>
-            <a href="${{r.review_url}}" target="_blank" class="text-emerald-400 hover:text-emerald-300 font-semibold inline-flex items-center gap-1 transition">
-              <span>Vedi su Amazon</span>
-              <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+          </td>
+
+          <td style="text-align: right;"><span class="price-badge">${{r.price || '-'}}</span></td>
+
+          <td style="text-align: center;">
+            <button class="reviews-btn ${{r.reviews_count > 0 ? 'has-revs' : ''}}" onclick="openReviewsModal(${{r.id}})" title="Leggi recensioni">
+              💬 ${{r.reviews_count}}
+            </button>
+          </td>
+
+          <td style="text-align: center;">
+            <span class="rating-badge">${{r.reviews_count > 0 ? r.avg_rating + ' ★' : '-'}}</span>
+          </td>
+
+          <td style="text-align: center;">
+            ${{r.new_30d > 0 ? `<span style="color: #16a34a; font-weight: 800; background: #dcfce7; padding: 2px 6px; border-radius: 999px; font-size: 0.78rem;">+${{r.new_30d}}</span>` : '<span style="color: #94a3b8;">0</span>'}}
+          </td>
+
+          <td style="text-align: center; font-size: 0.78rem; color: #64748b;">${{r.last_date}}</td>
+
+          <td style="text-align: center;">
+            <a href="${{r.product_url}}" target="_blank" class="btn-amazon">
+              <span>Apri ↗</span>
             </a>
-          </div>
-        </div>
+          </td>
+        </tr>
       `).join('');
     }}
 
-    function renderBooks(items) {{
-      const container = document.getElementById("booksList");
-      document.getElementById("booksCountBadge").innerText = items.length + " titoli";
+    function selectMarketplace(mkt, el) {{
+      currentMkt = mkt;
+      document.querySelectorAll('.mkt-tab').forEach(t => t.classList.remove('active'));
+      if (el) el.classList.add('active');
+      document.getElementById('currentMktTitle').innerText = mkt === 'all' ? 'Tutti i Marketplace' : mkt;
+      renderTable();
+    }}
 
-      if (items.length === 0) {{
-        container.innerHTML = `
-          <div class="col-span-full py-16 text-center glass-card rounded-2xl">
-            <div class="text-4xl mb-2">📚</div>
-            <p class="text-slate-400 text-sm font-medium">Nessun libro trovato.</p>
+    function handleSearch() {{
+      searchQuery = document.getElementById("tableSearch").value;
+      renderTable();
+    }}
+
+    function sortTable(colIdx, type) {{
+      if (currentSortCol === colIdx) {{
+        currentSortAsc = !currentSortAsc;
+      }} else {{
+        currentSortCol = colIdx;
+        currentSortAsc = (type === 'string');
+      }}
+
+      // Update UI classes
+      const ths = document.querySelectorAll('table.kdp-table th');
+      ths.forEach((th, idx) => {{
+        th.classList.remove('sorted-asc', 'sorted-desc');
+        if (idx === colIdx) {{
+          th.classList.add(currentSortAsc ? 'sorted-asc' : 'sorted-desc');
+        }}
+      }});
+
+      renderTable();
+    }}
+
+    function openReviewsModal(bookId) {{
+      const book = RAW_ROWS.find(b => b.id === bookId);
+      if (!book) return;
+
+      document.getElementById("modalBookTitle").innerText = `💬 Recensioni (${{book.reviews.length}}) - ${{book.title}}`;
+      const listEl = document.getElementById("modalReviewsList");
+
+      if (book.reviews.length === 0) {{
+        listEl.innerHTML = `
+          <div style="text-align: center; padding: 40px 20px; color: #64748b;">
+            Nessuna recensione testuale archiviata per questo store.
           </div>
         `;
-        return;
-      }}
-
-      container.innerHTML = items.map(b => `
-        <div class="glass-card rounded-2xl p-5 flex flex-col justify-between hover:border-slate-600 transition">
-          <div class="flex gap-4 items-start">
-            <img src="${{b.cover_image_url}}" alt="Cover" class="w-20 h-28 object-cover rounded-lg shadow-md bg-slate-900 border border-slate-800 flex-shrink-0" onerror="this.src='https://via.placeholder.com/80x110?text=KDP'">
-            <div class="flex-1 min-w-0">
-              <h4 class="font-bold text-white text-sm line-clamp-2 mb-1" title="${{b.title}}">${{b.title}}</h4>
-              <div class="text-xs text-slate-400 font-mono mb-2">ASIN: ${{b.asin}}</div>
-              
-              <div class="flex items-center gap-1.5 text-xs">
-                <span class="text-amber-400 font-bold">${{b.avg_rating}} ★</span>
-                <span class="text-slate-400">(${{b.reviews_count}} recensioni)</span>
-              </div>
-
-              ${{b.price ? `<div class="mt-2 text-xs font-semibold text-emerald-400">Cartaceo: ${{b.price}}</div>` : ''}}
-              ${{b.has_kindle ? `<div class="text-xs text-blue-400">Kindle: ${{b.kindle_price || 'Disponibile'}}</div>` : ''}}
-            </div>
-          </div>
-
-          <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
-            <span class="text-[11px] text-slate-400">${{b.marketplaces.length}} store monitorati</span>
-            <a href="https://www.amazon.it/dp/${{b.asin}}" target="_blank" class="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-semibold text-xs inline-flex items-center gap-1.5 transition">
-              <span>Scheda Amazon</span>
-              <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
-            </a>
-          </div>
-        </div>
-      `).join('');
-    }}
-
-    function filterData() {{
-      const query = document.getElementById("searchInput").value.toLowerCase().trim();
-      const mkt = document.getElementById("marketplaceFilter").value;
-      const stars = document.getElementById("starsFilter").value;
-
-      // Filter reviews
-      const filteredRevs = ALL_REVIEWS.filter(r => {{
-        const matchQuery = !query || r.title.toLowerCase().includes(query) || r.body.toLowerCase().includes(query) || r.author.toLowerCase().includes(query) || r.asin.toLowerCase().includes(query) || r.book_title.toLowerCase().includes(query);
-        const matchMkt = !mkt || r.marketplace === mkt;
-        let matchStars = true;
-        if (stars === "5") matchStars = r.rating >= 4.7;
-        else if (stars === "4") matchStars = r.rating >= 3.7 && r.rating < 4.7;
-        else if (stars === "3") matchStars = r.rating < 3.7;
-        return matchQuery && matchMkt && matchStars;
-      }});
-
-      renderReviews(filteredRevs);
-
-      // Filter books
-      const filteredBooks = ALL_BOOKS.filter(b => {{
-        const matchQuery = !query || b.title.toLowerCase().includes(query) || b.asin.toLowerCase().includes(query);
-        const matchMkt = !mkt || b.marketplaces.includes(mkt);
-        return matchQuery && matchMkt;
-      }});
-
-      renderBooks(filteredBooks);
-    }}
-
-    function switchView(tab) {{
-      if (tab === "books") {{
-        document.getElementById("booksContainer").classList.remove("hidden");
-        document.getElementById("reviewsContainer").classList.add("hidden");
       }} else {{
-        document.getElementById("booksContainer").classList.add("hidden");
-        document.getElementById("reviewsContainer").classList.remove("hidden");
+        listEl.innerHTML = book.reviews.map(r => `
+          <div class="review-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <span class="review-stars">${{r.stars}} ${{r.rating}}/5</span>
+              <a href="${{r.url}}" target="_blank" style="font-size: 0.78rem; color: #0284c7; font-weight: 700; text-decoration: underline;">Vedi su Amazon ↗</a>
+            </div>
+            <div class="review-title">${{r.title}}</div>
+            <div class="review-meta">Scritta da <strong>${{r.author}}</strong> ${{r.date ? 'il ' + r.date : ''}}</div>
+            <div class="review-text">${{r.body}}</div>
+          </div>
+        `).join('');
       }}
+
+      document.getElementById("reviewsModal").classList.add("open");
     }}
 
-    // Initial render
-    renderReviews(ALL_REVIEWS);
-    renderBooks(ALL_BOOKS);
+    function closeReviewsModal(e) {{
+      document.getElementById("reviewsModal").classList.remove("open");
+    }}
+
+    // Initial table render
+    sortTable(5, 'number'); // Default sort by reviews count descending
   </script>
 
 </body>
@@ -487,6 +929,6 @@ def generate_static_html(output_path: Path) -> str:
 
 if __name__ == "__main__":
     out_file = BASE_DIR / "docs" / "index.html"
-    print(f"Generating static dashboard to {out_file}...")
+    print(f"Generating clean table dashboard to {out_file}...")
     res = generate_static_html(out_file)
-    print(f"Dashboard successfully generated at: {res}")
+    print(f"Dashboard generated: {res}")
