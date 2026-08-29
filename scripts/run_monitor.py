@@ -68,8 +68,18 @@ def main():
             )
         else:
             logger.info(f"Check skipped: {report.get('reason')}")
+
+        # Always update GitHub Pages static dashboard
+        try:
+            from scripts.generate_static_dashboard import generate_static_html
+            out_file = BASE_DIR / "docs" / "index.html"
+            generate_static_html(out_file)
+            logger.info(f"Static GitHub Pages dashboard generated at {out_file}")
+        except Exception as ge:
+            logger.warning(f"Could not generate static dashboard: {ge}")
             
     except Exception as e:
+
         logger.error(f"Fatal error during monitor run: {e}", exc_info=True)
         sys.exit(1)
     finally:

@@ -42,16 +42,15 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD || '' }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD || '' }}
           APP_SECRET_KEY: ${{ secrets.APP_SECRET_KEY || '' }}
-          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL || 'https://github.com/indiebookstudio/review-monitor' }}
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL || 'https://indiebookstudio.github.io/review-monitor/' }}
         run: |
           python scripts/run_monitor.py --force
+          python scripts/generate_static_dashboard.py
 
-
-      - name: Commit and Push Database State
+      - name: Commit and Push Database and GitHub Pages
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git pull --rebase origin master || true
-          git add data/kdp_monitor.db
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update KDP review database [skip ci]" && git push)
-
+          git add data/kdp_monitor.db docs/index.html
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update KDP review database and GitHub Pages [skip ci]" && git push)

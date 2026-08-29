@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="it" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KDP Review Monitor &mdash; Live Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50: '#f0fdf4', 500: '#22c55e', 600: '#16a34a' },
+            accent: { 500: '#f59e0b', 600: '#d97706' }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .star-amber { color: #f59e0b; }
+    .glass-card { background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.6); }
+  </style>
+</head>
+<body class="min-h-full flex flex-col antialiased selection:bg-emerald-500 selection:text-white pb-16">
+
+  <!-- Navigation Bar -->
+  <header class="sticky top-0 z-40 bg-slate-900/90 backdrop-blur border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-emerald-500 flex items-center justify-center text-slate-950 font-black text-xl shadow-lg shadow-emerald-500/10">
+          📚
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+            KDP Review Monitor
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              🟢 Live
+            </span>
+          </h1>
+          <p class="text-xs text-slate-400">Scansione notturna automatica &bull; Aggiornato 29/08/2026 alle 19:01 UTC</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <a href="https://github.com/indiebookstudio/review-monitor/actions" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-300 transition">
+          <i class="fa-brands fa-github"></i>
+          <span>GitHub Actions</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-8">
+
+    <!-- KPI Summary Grid -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <div class="glass-card rounded-2xl p-5 relative overflow-hidden">
+        <div class="flex justify-between items-start">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Libri Monitorati</span>
+          <div class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-book"></i>
+          </div>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span class="text-3xl font-extrabold text-white">22</span>
+          <span class="text-xs text-slate-400">(308 store)</span>
+        </div>
+        <div class="mt-1 text-xs text-emerald-400 font-medium">100% attivi</div>
+      </div>
+
+      <div class="glass-card rounded-2xl p-5 relative overflow-hidden">
+        <div class="flex justify-between items-start">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Recensioni Totali</span>
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-comments"></i>
+          </div>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span class="text-3xl font-extrabold text-emerald-400">81</span>
+          <span class="text-xs text-slate-400">archiviate</span>
+        </div>
+        <div class="mt-1 text-xs text-slate-400">Su Amazon globale</div>
+      </div>
+
+      <div class="glass-card rounded-2xl p-5 relative overflow-hidden">
+        <div class="flex justify-between items-start">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Rating Globale</span>
+          <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-star"></i>
+          </div>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span class="text-3xl font-extrabold text-amber-400">5.0</span>
+          <span class="text-xs text-amber-400/80">/ 5.0 ★</span>
+        </div>
+        <div class="mt-1 text-xs text-amber-300/80 font-mono tracking-widest">★★★★★</div>
+      </div>
+
+      <div class="glass-card rounded-2xl p-5 relative overflow-hidden">
+        <div class="flex justify-between items-start">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Prossimo Check</span>
+          <div class="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-moon"></i>
+          </div>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span class="text-xl font-bold text-purple-300">03:00 UTC</span>
+        </div>
+        <div class="mt-1 text-xs text-purple-400 font-medium">Ogni notte con notifica email</div>
+      </div>
+
+    </div>
+
+    <!-- Rating Distribution & Quick Stats -->
+    <div class="glass-card rounded-2xl p-6">
+      <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+        <i class="fa-solid fa-chart-simple text-amber-400"></i> Distribuzione Valutazioni a Stelle
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+        
+        <div class="bg-slate-900/60 rounded-xl p-4 border border-slate-800 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-bold text-amber-400">5 ★</span>
+            <span class="text-xs text-slate-400">81 recensioni</span>
+          </div>
+          <div class="w-full bg-slate-800 rounded-full h-2 mt-3 overflow-hidden">
+            <div class="bg-amber-400 h-2 rounded-full" style="width: 100.0%;"></div>
+          </div>
+          <div class="mt-2 text-right text-xs font-semibold text-slate-300">100.0%</div>
+        </div>
+        
+        <div class="bg-slate-900/60 rounded-xl p-4 border border-slate-800 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-bold text-amber-400">4 ★</span>
+            <span class="text-xs text-slate-400">0 recensioni</span>
+          </div>
+          <div class="w-full bg-slate-800 rounded-full h-2 mt-3 overflow-hidden">
+            <div class="bg-amber-400 h-2 rounded-full" style="width: 0.0%;"></div>
+          </div>
+          <div class="mt-2 text-right text-xs font-semibold text-slate-300">0.0%</div>
+        </div>
+        
+        <div class="bg-slate-900/60 rounded-xl p-4 border border-slate-800 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-bold text-amber-400">3 ★</span>
+            <span class="text-xs text-slate-400">0 recensioni</span>
+          </div>
+          <div class="w-full bg-slate-800 rounded-full h-2 mt-3 overflow-hidden">
+            <div class="bg-amber-400 h-2 rounded-full" style="width: 0.0%;"></div>
+          </div>
+          <div class="mt-2 text-right text-xs font-semibold text-slate-300">0.0%</div>
+        </div>
+        
+        <div class="bg-slate-900/60 rounded-xl p-4 border border-slate-800 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-bold text-amber-400">2 ★</span>
+            <span class="text-xs text-slate-400">0 recensioni</span>
+          </div>
+          <div class="w-full bg-slate-800 rounded-full h-2 mt-3 overflow-hidden">
+            <div class="bg-amber-400 h-2 rounded-full" style="width: 0.0%;"></div>
+          </div>
+          <div class="mt-2 text-right text-xs font-semibold text-slate-300">0.0%</div>
+        </div>
+        
+        <div class="bg-slate-900/60 rounded-xl p-4 border border-slate-800 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-bold text-amber-400">1 ★</span>
+            <span class="text-xs text-slate-400">0 recensioni</span>
+          </div>
+          <div class="w-full bg-slate-800 rounded-full h-2 mt-3 overflow-hidden">
+            <div class="bg-amber-400 h-2 rounded-full" style="width: 0.0%;"></div>
+          </div>
+          <div class="mt-2 text-right text-xs font-semibold text-slate-300">0.0%</div>
+        </div>
+        
+      </div>
+    </div>
+
+    <!-- Interactive Filter & Search Bar -->
+    <div class="glass-card rounded-2xl p-4 sm:p-5">
+      <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
+        
+        <!-- Search Input -->
+        <div class="relative w-full md:w-96">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+          <input 
+            type="text" 
+            id="searchInput" 
+            placeholder="Cerca libro, ASIN, autore o testo..." 
+            class="w-full pl-10 pr-4 py-2 bg-slate-900/80 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
+            oninput="filterData()"
+          >
+        </div>
+
+        <!-- Filter Selects -->
+        <div class="flex flex-wrap gap-2 w-full md:w-auto">
+          <select id="tabFilter" onchange="switchView(this.value)" class="px-3 py-2 bg-slate-900/80 border border-slate-700 rounded-xl text-xs font-semibold text-slate-200 focus:outline-none focus:border-emerald-500">
+            <option value="reviews">💬 Tutte le Recensioni (81)</option>
+            <option value="books">📖 Catalogo Libri (22)</option>
+          </select>
+
+          <select id="marketplaceFilter" onchange="filterData()" class="px-3 py-2 bg-slate-900/80 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+            <option value="">🌐 Tutti i Marketplace</option>
+            <option value="amazon.it">🇮🇹 Amazon.it</option>
+            <option value="amazon.com">🇺🇸 Amazon.com</option>
+            <option value="amazon.co.uk">🇬🇧 Amazon.co.uk</option>
+            <option value="amazon.de">🇩🇪 Amazon.de</option>
+            <option value="amazon.fr">🇫🇷 Amazon.fr</option>
+            <option value="amazon.es">🇪🇸 Amazon.es</option>
+          </select>
+
+          <select id="starsFilter" onchange="filterData()" class="px-3 py-2 bg-slate-900/80 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+            <option value="">⭐ Tutte le stelle</option>
+            <option value="5">5 Stelle (★★★★★)</option>
+            <option value="4">4 Stelle (★★★★☆)</option>
+            <option value="3">3 Stelle o meno (≤ ★★★☆☆)</option>
+          </select>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Section 1: Reviews Feed Container -->
+    <div id="reviewsContainer" class="space-y-4">
+      <div class="flex items-center justify-between px-1">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <span>Elenco Recensioni</span>
+          <span id="reviewsCountBadge" class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-normal">
+            81 elementi
+          </span>
+        </h3>
+      </div>
+      
+      <div id="reviewsList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Rendered dynamically by JS -->
+      </div>
+    </div>
+
+    <!-- Section 2: Books Catalog Container -->
+    <div id="booksContainer" class="hidden space-y-4">
+      <div class="flex items-center justify-between px-1">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <span>Catalogo Libri Monitorati</span>
+          <span id="booksCountBadge" class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-normal">
+            22 titoli
+          </span>
+        </h3>
+      </div>
+
+      <div id="booksList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <!-- Rendered dynamically by JS -->
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="mt-auto border-t border-slate-900 py-6 text-center text-xs text-slate-500">
+    <p>KDP Review Monitor &bull; 100% GitHub Actions &amp; GitHub Pages &bull; Aggiornato automaticamente ogni notte</p>
+  </footer>
+
+  <!-- Client-Side Data & Script -->
+  <script>
+    const ALL_REVIEWS = [{"id": 131, "asin": "B0H6MN4LW7", "book_title": "Benny l'escavatore e la collina che cambiava forma: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.it", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "chiara", "review_date": "Recensito in Italia il 6 luglio 2026", "review_url": "https://www.amazon.it/gp/customer-reviews/R10SP0GXEFS2HT", "first_seen_at": "29/08/2026"}, {"id": 130, "asin": "B0H6MN4LW7", "book_title": "Benny l'escavatore e la collina che cambiava forma: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.it", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Edoardo Gattei", "review_date": "Recensito in Italia il 4 luglio 2026", "review_url": "https://www.amazon.it/gp/customer-reviews/RSVFOI8BM4GZS", "first_seen_at": "29/08/2026"}, {"id": 129, "asin": "B0H6MN4LW7", "book_title": "Benny l'escavatore e la collina che cambiava forma: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.it", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Michele L.", "review_date": "Recensito in Italia il 6 luglio 2026", "review_url": "https://www.amazon.it/gp/customer-reviews/R1FHX2JIHM97U5", "first_seen_at": "29/08/2026"}, {"id": 128, "asin": "B0H6MN4LW7", "book_title": "Benny l'escavatore e la collina che cambiava forma: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.it", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Stefania Omiccioli", "review_date": "Recensito in Italia il 2 agosto 2026", "review_url": "https://www.amazon.it/gp/customer-reviews/R3JEQGSQGRQA9Z", "first_seen_at": "29/08/2026"}, {"id": 127, "asin": "B0HD2X6HVJ", "book_title": "Fano col naso all'ins\u00f9: La citt\u00e0 di Vitruvio da scoprire e colorare | Libro da colorare con oltre 40 disegni, giochi e attivit\u00e0 creative per bambini 5-10 anni", "marketplace": "amazon.ie", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Edoardo Gattei", "review_date": "Reviewed in Italy on 10 August 2026", "review_url": "https://www.amazon.ie/gp/customer-reviews/R6F2DTVPPJNU0", "first_seen_at": "27/08/2026"}, {"id": 126, "asin": "B0HD2X6HVJ", "book_title": "Fano col naso all'ins\u00f9: La citt\u00e0 di Vitruvio da scoprire e colorare | Libro da colorare con oltre 40 disegni, giochi e attivit\u00e0 creative per bambini 5-10 anni", "marketplace": "amazon.se", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Edoardo Gattei", "review_date": "Granskad i Italien den 10 augusti 2026", "review_url": "https://www.amazon.se/gp/customer-reviews/R6F2DTVPPJNU0", "first_seen_at": "27/08/2026"}, {"id": 125, "asin": "B0HD2X6HVJ", "book_title": "Fano col naso all'ins\u00f9: La citt\u00e0 di Vitruvio da scoprire e colorare | Libro da colorare con oltre 40 disegni, giochi e attivit\u00e0 creative per bambini 5-10 anni", "marketplace": "amazon.pl", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Edoardo Gattei", "review_date": "Zrecenzowano we W\u0142oszech dnia 10 sierpnia 2026", "review_url": "https://www.amazon.pl/gp/customer-reviews/R6F2DTVPPJNU0", "first_seen_at": "27/08/2026"}, {"id": 124, "asin": "B0HD2X6HVJ", "book_title": "Fano col naso all'ins\u00f9: La citt\u00e0 di Vitruvio da scoprire e colorare | Libro da colorare con oltre 40 disegni, giochi e attivit\u00e0 creative per bambini 5-10 anni", "marketplace": "amazon.de", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Edoardo Gattei", "review_date": "Bewertet in Italien am 10. August 2026", "review_url": "https://www.amazon.de/gp/customer-reviews/R6F2DTVPPJNU0", "first_seen_at": "27/08/2026"}, {"id": 123, "asin": "B0HD2X6HVJ", "book_title": "Fano col naso all'ins\u00f9: La citt\u00e0 di Vitruvio da scoprire e colorare | Libro da colorare con oltre 40 disegni, giochi e attivit\u00e0 creative per bambini 5-10 anni", "marketplace": "amazon.com", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Edoardo Gattei", "review_date": "Reviewed in Italy on August 10, 2026", "review_url": "https://www.amazon.com/gp/customer-reviews/R6F2DTVPPJNU0", "first_seen_at": "27/08/2026"}, {"id": 122, "asin": "B0H6VBNX5D", "book_title": "Benny l'escavatore e le monete dell'antica Roma: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.com.au", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Reviewed in Italy on 12 July 2026", "review_url": "https://www.amazon.com.au/gp/customer-reviews/R3KH5K024J9EN0", "first_seen_at": "27/08/2026"}, {"id": 121, "asin": "B0H6VBNX5D", "book_title": "Benny l'escavatore e le monete dell'antica Roma: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.co.jp", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "2026\u5e747\u670812\u65e5\u306b\u30a4\u30bf\u30ea\u30a2\u3067\u30ec\u30d3\u30e5\u30fc\u6e08\u307f", "review_url": "https://www.amazon.co.jp/gp/customer-reviews/R3KH5K024J9EN0", "first_seen_at": "27/08/2026"}, {"id": 120, "asin": "B0H6VBNX5D", "book_title": "Benny l'escavatore e le monete dell'antica Roma: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.com.be", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Reviewed in Italy on 12 July 2026", "review_url": "https://www.amazon.com.be/gp/customer-reviews/R3KH5K024J9EN0", "first_seen_at": "27/08/2026"}, {"id": 119, "asin": "B0H6VBNX5D", "book_title": "Benny l'escavatore e le monete dell'antica Roma: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.pl", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Zrecenzowano we W\u0142oszech dnia 12 lipca 2026", "review_url": "https://www.amazon.pl/gp/customer-reviews/R3KH5K024J9EN0", "first_seen_at": "27/08/2026"}, {"id": 118, "asin": "B0H6VBNX5D", "book_title": "Benny l'escavatore e le monete dell'antica Roma: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.nl", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Beoordeeld in Itali\u00eb op 12 juli 2026", "review_url": "https://www.amazon.nl/gp/customer-reviews/R3KH5K024J9EN0", "first_seen_at": "27/08/2026"}, {"id": 117, "asin": "B0H6VBNX5D", "book_title": "Benny l'escavatore e le monete dell'antica Roma: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.se", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Granskad i Italien den 12 juli 2026", "review_url": "https://www.amazon.se/gp/customer-reviews/R3KH5K024J9EN0", "first_seen_at": "27/08/2026"}, {"id": 116, "asin": "B0H6VBNX5D", "book_title": "Benny l'escavatore e le monete dell'antica Roma: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.es", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Rese\u00f1ado en Italia el 12 de julio de 2026", "review_url": "https://www.amazon.es/gp/customer-reviews/R3KH5K024J9EN0", "first_seen_at": "27/08/2026"}, {"id": 115, "asin": "B0H6VBNX5D", "book_title": "Benny l'escavatore e le monete dell'antica Roma: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.de", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Bewertet in Italien am 12. Juli 2026", "review_url": "https://www.amazon.de/gp/customer-reviews/R3KH5K024J9EN0", "first_seen_at": "27/08/2026"}, {"id": 114, "asin": "B0H6VBNX5D", "book_title": "Benny l'escavatore e le monete dell'antica Roma: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.fr", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Avis laiss\u00e9 en Italie le 12 juillet 2026", "review_url": "https://www.amazon.fr/gp/customer-reviews/R3KH5K024J9EN0", "first_seen_at": "27/08/2026"}, {"id": 113, "asin": "B0H6VBNX5D", "book_title": "Benny l'escavatore e le monete dell'antica Roma: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.co.uk", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Reviewed in Italy on 12 July 2026", "review_url": "https://www.amazon.co.uk/gp/customer-reviews/R3KH5K024J9EN0", "first_seen_at": "27/08/2026"}, {"id": 112, "asin": "B0H6VBNX5D", "book_title": "Benny l'escavatore e le monete dell'antica Roma: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.it", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Matteo&Mari", "review_date": "Recensito in Italia il 2 luglio 2026", "review_url": "https://www.amazon.it/gp/customer-reviews/R2FD7WS7CG8SJD", "first_seen_at": "27/08/2026"}, {"id": 111, "asin": "B0H6VBNX5D", "book_title": "Benny l'escavatore e le monete dell'antica Roma: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.it", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Federica F.", "review_date": "Recensito in Italia il 4 luglio 2026", "review_url": "https://www.amazon.it/gp/customer-reviews/RORDEM57AXFCX", "first_seen_at": "27/08/2026"}, {"id": 110, "asin": "B0H6VBNX5D", "book_title": "Benny l'escavatore e le monete dell'antica Roma: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.it", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Michele L.", "review_date": "Recensito in Italia il 19 luglio 2026", "review_url": "https://www.amazon.it/gp/customer-reviews/R2ZME0O1GBBNGP", "first_seen_at": "27/08/2026"}, {"id": 109, "asin": "B0H6VBNX5D", "book_title": "Benny l'escavatore e le monete dell'antica Roma: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.it", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "chiara", "review_date": "Recensito in Italia il 6 luglio 2026", "review_url": "https://www.amazon.it/gp/customer-reviews/RZ9EE2MLGEETR", "first_seen_at": "27/08/2026"}, {"id": 108, "asin": "B0H6VBNX5D", "book_title": "Benny l'escavatore e le monete dell'antica Roma: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.it", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Recensito in Italia il 12 luglio 2026", "review_url": "https://www.amazon.it/gp/customer-reviews/R3KH5K024J9EN0", "first_seen_at": "27/08/2026"}, {"id": 107, "asin": "B0H7JK9R46", "book_title": "Leo la gru e il nido della cinciallegra: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.ca", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Reviewed in Italy on July 12, 2026", "review_url": "https://www.amazon.ca/gp/customer-reviews/R11E3VMNOMG9Z2", "first_seen_at": "27/08/2026"}, {"id": 106, "asin": "B0H7JK9R46", "book_title": "Leo la gru e il nido della cinciallegra: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.com.be", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Avis laiss\u00e9 en Italie le 12 juillet 2026", "review_url": "https://www.amazon.com.be/gp/customer-reviews/R11E3VMNOMG9Z2", "first_seen_at": "27/08/2026"}, {"id": 105, "asin": "B0H7JK9R46", "book_title": "Leo la gru e il nido della cinciallegra: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.co.jp", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "2026\u5e747\u670812\u65e5\u306b\u30a4\u30bf\u30ea\u30a2\u3067\u30ec\u30d3\u30e5\u30fc\u6e08\u307f", "review_url": "https://www.amazon.co.jp/gp/customer-reviews/R11E3VMNOMG9Z2", "first_seen_at": "27/08/2026"}, {"id": 104, "asin": "B0H7JK9R46", "book_title": "Leo la gru e il nido della cinciallegra: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.ie", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Reviewed in Italy on 12 July 2026", "review_url": "https://www.amazon.ie/gp/customer-reviews/R11E3VMNOMG9Z2", "first_seen_at": "27/08/2026"}, {"id": 103, "asin": "B0H7JK9R46", "book_title": "Leo la gru e il nido della cinciallegra: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.se", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Granskad i Italien den 12 juli 2026", "review_url": "https://www.amazon.se/gp/customer-reviews/R11E3VMNOMG9Z2", "first_seen_at": "27/08/2026"}, {"id": 102, "asin": "B0H7JK9R46", "book_title": "Leo la gru e il nido della cinciallegra: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.pl", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Zrecenzowano we W\u0142oszech dnia 12 lipca 2026", "review_url": "https://www.amazon.pl/gp/customer-reviews/R11E3VMNOMG9Z2", "first_seen_at": "27/08/2026"}, {"id": 101, "asin": "B0H7JK9R46", "book_title": "Leo la gru e il nido della cinciallegra: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.nl", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Beoordeeld in Itali\u00eb op 12 juli 2026", "review_url": "https://www.amazon.nl/gp/customer-reviews/R11E3VMNOMG9Z2", "first_seen_at": "27/08/2026"}, {"id": 100, "asin": "B0H7JK9R46", "book_title": "Leo la gru e il nido della cinciallegra: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.de", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Bewertet in Italien am 12. Juli 2026", "review_url": "https://www.amazon.de/gp/customer-reviews/R11E3VMNOMG9Z2", "first_seen_at": "27/08/2026"}, {"id": 99, "asin": "B0H7JK9R46", "book_title": "Leo la gru e il nido della cinciallegra: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.co.uk", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Reviewed in Italy on 12 July 2026", "review_url": "https://www.amazon.co.uk/gp/customer-reviews/R11E3VMNOMG9Z2", "first_seen_at": "27/08/2026"}, {"id": 98, "asin": "B0H7JK9R46", "book_title": "Leo la gru e il nido della cinciallegra: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.com", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Reviewed in Italy on July 12, 2026", "review_url": "https://www.amazon.com/gp/customer-reviews/R11E3VMNOMG9Z2", "first_seen_at": "27/08/2026"}, {"id": 97, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.ca", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Reviewed in Italy on July 12, 2026", "review_url": "https://www.amazon.ca/gp/customer-reviews/RSQSC0SMPNNCN", "first_seen_at": "27/08/2026"}, {"id": 96, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.ca", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Mattia B.", "review_date": "Reviewed in Italy on July 7, 2026", "review_url": "https://www.amazon.ca/gp/customer-reviews/R2RIBCLVXIU3MD", "first_seen_at": "27/08/2026"}, {"id": 95, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.it", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "chiara", "review_date": "Recensito in Italia il 6 luglio 2026", "review_url": "https://www.amazon.it/gp/customer-reviews/R1GIWB5SMRO3G6", "first_seen_at": "27/08/2026"}, {"id": 94, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.it", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Eleonora", "review_date": "Recensito in Italia il 7 luglio 2026", "review_url": "https://www.amazon.it/gp/customer-reviews/R3IDA51OQ8PWEH", "first_seen_at": "27/08/2026"}, {"id": 93, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.it", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Michele L.", "review_date": "Recensito in Italia il 6 luglio 2026", "review_url": "https://www.amazon.it/gp/customer-reviews/R1Q9VUXMPVIPXX", "first_seen_at": "27/08/2026"}, {"id": 92, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.it", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Recensito in Italia il 12 luglio 2026", "review_url": "https://www.amazon.it/gp/customer-reviews/RSQSC0SMPNNCN", "first_seen_at": "27/08/2026"}, {"id": 91, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.it", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Mattia B.", "review_date": "Recensito in Italia il 7 luglio 2026", "review_url": "https://www.amazon.it/gp/customer-reviews/R2RIBCLVXIU3MD", "first_seen_at": "27/08/2026"}, {"id": 90, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.com", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Reviewed in Italy on July 12, 2026", "review_url": "https://www.amazon.com/gp/customer-reviews/RSQSC0SMPNNCN", "first_seen_at": "27/08/2026"}, {"id": 89, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.com", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Mattia B.", "review_date": "Reviewed in Italy on July 7, 2026", "review_url": "https://www.amazon.com/gp/customer-reviews/R2RIBCLVXIU3MD", "first_seen_at": "27/08/2026"}, {"id": 88, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.co.jp", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "2026\u5e747\u670812\u65e5\u306b\u30a4\u30bf\u30ea\u30a2\u3067\u30ec\u30d3\u30e5\u30fc\u6e08\u307f", "review_url": "https://www.amazon.co.jp/gp/customer-reviews/RSQSC0SMPNNCN", "first_seen_at": "27/08/2026"}, {"id": 87, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.co.jp", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Mattia B.", "review_date": "2026\u5e747\u67087\u65e5\u306b\u30a4\u30bf\u30ea\u30a2\u3067\u30ec\u30d3\u30e5\u30fc\u6e08\u307f", "review_url": "https://www.amazon.co.jp/gp/customer-reviews/R2RIBCLVXIU3MD", "first_seen_at": "27/08/2026"}, {"id": 86, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.com.be", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Reviewed in Italy on 12 July 2026", "review_url": "https://www.amazon.com.be/gp/customer-reviews/RSQSC0SMPNNCN", "first_seen_at": "27/08/2026"}, {"id": 85, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.com.be", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Mattia B.", "review_date": "Reviewed in Italy on 7 July 2026", "review_url": "https://www.amazon.com.be/gp/customer-reviews/R2RIBCLVXIU3MD", "first_seen_at": "27/08/2026"}, {"id": 84, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.nl", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Beoordeeld in Itali\u00eb op 12 juli 2026", "review_url": "https://www.amazon.nl/gp/customer-reviews/RSQSC0SMPNNCN", "first_seen_at": "27/08/2026"}, {"id": 83, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.nl", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Mattia B.", "review_date": "Beoordeeld in Itali\u00eb op 7 juli 2026", "review_url": "https://www.amazon.nl/gp/customer-reviews/R2RIBCLVXIU3MD", "first_seen_at": "27/08/2026"}, {"id": 82, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.de", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Bewertet in Italien am 12. Juli 2026", "review_url": "https://www.amazon.de/gp/customer-reviews/RSQSC0SMPNNCN", "first_seen_at": "27/08/2026"}, {"id": 81, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.de", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Mattia B.", "review_date": "Bewertet in Italien am 7. Juli 2026", "review_url": "https://www.amazon.de/gp/customer-reviews/R2RIBCLVXIU3MD", "first_seen_at": "27/08/2026"}, {"id": 80, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.fr", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Avis laiss\u00e9 en Italie le 12 juillet 2026", "review_url": "https://www.amazon.fr/gp/customer-reviews/RSQSC0SMPNNCN", "first_seen_at": "27/08/2026"}, {"id": 79, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.fr", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Mattia B.", "review_date": "Avis laiss\u00e9 en Italie le 7 juillet 2026", "review_url": "https://www.amazon.fr/gp/customer-reviews/R2RIBCLVXIU3MD", "first_seen_at": "27/08/2026"}, {"id": 78, "asin": "B0HD2X6HVJ", "book_title": "Fano col naso all'ins\u00f9: La citt\u00e0 di Vitruvio da scoprire e colorare | Libro da colorare con oltre 40 disegni, giochi e attivit\u00e0 creative per bambini 5-10 anni", "marketplace": "amazon.it", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Edoardo Gattei", "review_date": "Recensito in Italia il 10 agosto 2026", "review_url": "https://www.amazon.it/gp/customer-reviews/R6F2DTVPPJNU0", "first_seen_at": "27/08/2026"}, {"id": 77, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.es", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Rese\u00f1ado en Italia el 12 de julio de 2026", "review_url": "https://www.amazon.es/gp/customer-reviews/RSQSC0SMPNNCN", "first_seen_at": "27/08/2026"}, {"id": 76, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.es", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Mattia B.", "review_date": "Rese\u00f1ado en Italia el 7 de julio de 2026", "review_url": "https://www.amazon.es/gp/customer-reviews/R2RIBCLVXIU3MD", "first_seen_at": "27/08/2026"}, {"id": 75, "asin": "B0H75DDGLQ", "book_title": "Rino il rullo e i ladri del cantiere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.it", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Michele L.", "review_date": "Recensito in Italia il 19 luglio 2026", "review_url": "https://www.amazon.it/gp/customer-reviews/R3ONPVNTU5WDYR", "first_seen_at": "27/08/2026"}, {"id": 74, "asin": "B0H6MY4W6X", "book_title": "Leo la gru e le gemme della montagna: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.it", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "chiara", "review_date": "Recensito in Italia il 6 luglio 2026", "review_url": "https://www.amazon.it/gp/customer-reviews/R3SEGXHR94YFS", "first_seen_at": "27/08/2026"}, {"id": 73, "asin": "B0H6MY4W6X", "book_title": "Leo la gru e le gemme della montagna: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.it", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Michele L.", "review_date": "Recensito in Italia il 6 luglio 2026", "review_url": "https://www.amazon.it/gp/customer-reviews/R185T86AWXPTBA", "first_seen_at": "27/08/2026"}, {"id": 72, "asin": "B0HD2X6HVJ", "book_title": "Fano col naso all'ins\u00f9: La citt\u00e0 di Vitruvio da scoprire e colorare | Libro da colorare con oltre 40 disegni, giochi e attivit\u00e0 creative per bambini 5-10 anni", "marketplace": "amazon.com.au", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Edoardo Gattei", "review_date": "Reviewed in Italy on 10 August 2026", "review_url": "https://www.amazon.com.au/gp/customer-reviews/R6F2DTVPPJNU0", "first_seen_at": "27/08/2026"}, {"id": 71, "asin": "B0HD2X6HVJ", "book_title": "Fano col naso all'ins\u00f9: La citt\u00e0 di Vitruvio da scoprire e colorare | Libro da colorare con oltre 40 disegni, giochi e attivit\u00e0 creative per bambini 5-10 anni", "marketplace": "amazon.co.jp", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Edoardo Gattei", "review_date": "2026\u5e748\u670810\u65e5\u306b\u30a4\u30bf\u30ea\u30a2\u3067\u30ec\u30d3\u30e5\u30fc\u6e08\u307f", "review_url": "https://www.amazon.co.jp/gp/customer-reviews/R6F2DTVPPJNU0", "first_seen_at": "27/08/2026"}, {"id": 70, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.ie", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Reviewed in Italy on 12 July 2026", "review_url": "https://www.amazon.ie/gp/customer-reviews/RSQSC0SMPNNCN", "first_seen_at": "27/08/2026"}, {"id": 69, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.ie", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Mattia B.", "review_date": "Reviewed in Italy on 7 July 2026", "review_url": "https://www.amazon.ie/gp/customer-reviews/R2RIBCLVXIU3MD", "first_seen_at": "27/08/2026"}, {"id": 68, "asin": "B0HD2X6HVJ", "book_title": "Fano col naso all'ins\u00f9: La citt\u00e0 di Vitruvio da scoprire e colorare | Libro da colorare con oltre 40 disegni, giochi e attivit\u00e0 creative per bambini 5-10 anni", "marketplace": "amazon.nl", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Edoardo Gattei", "review_date": "Beoordeeld in Itali\u00eb op 10 augustus 2026", "review_url": "https://www.amazon.nl/gp/customer-reviews/R6F2DTVPPJNU0", "first_seen_at": "27/08/2026"}, {"id": 67, "asin": "B0HD2X6HVJ", "book_title": "Fano col naso all'ins\u00f9: La citt\u00e0 di Vitruvio da scoprire e colorare | Libro da colorare con oltre 40 disegni, giochi e attivit\u00e0 creative per bambini 5-10 anni", "marketplace": "amazon.es", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Edoardo Gattei", "review_date": "Rese\u00f1ado en Italia el 10 de agosto de 2026", "review_url": "https://www.amazon.es/gp/customer-reviews/R6F2DTVPPJNU0", "first_seen_at": "27/08/2026"}, {"id": 66, "asin": "B0HD2X6HVJ", "book_title": "Fano col naso all'ins\u00f9: La citt\u00e0 di Vitruvio da scoprire e colorare | Libro da colorare con oltre 40 disegni, giochi e attivit\u00e0 creative per bambini 5-10 anni", "marketplace": "amazon.fr", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Edoardo Gattei", "review_date": "Avis laiss\u00e9 en Italie le 10 ao\u00fbt 2026", "review_url": "https://www.amazon.fr/gp/customer-reviews/R6F2DTVPPJNU0", "first_seen_at": "27/08/2026"}, {"id": 65, "asin": "B0HD2X6HVJ", "book_title": "Fano col naso all'ins\u00f9: La citt\u00e0 di Vitruvio da scoprire e colorare | Libro da colorare con oltre 40 disegni, giochi e attivit\u00e0 creative per bambini 5-10 anni", "marketplace": "amazon.co.uk", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Edoardo Gattei", "review_date": "Reviewed in Italy on 10 August 2026", "review_url": "https://www.amazon.co.uk/gp/customer-reviews/R6F2DTVPPJNU0", "first_seen_at": "27/08/2026"}, {"id": 64, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.com.au", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Reviewed in Italy on 12 July 2026", "review_url": "https://www.amazon.com.au/gp/customer-reviews/RSQSC0SMPNNCN", "first_seen_at": "27/08/2026"}, {"id": 63, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.com.au", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Mattia B.", "review_date": "Reviewed in Italy on 7 July 2026", "review_url": "https://www.amazon.com.au/gp/customer-reviews/R2RIBCLVXIU3MD", "first_seen_at": "27/08/2026"}, {"id": 62, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.se", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Granskad i Italien den 12 juli 2026", "review_url": "https://www.amazon.se/gp/customer-reviews/RSQSC0SMPNNCN", "first_seen_at": "27/08/2026"}, {"id": 61, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.se", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Mattia B.", "review_date": "Granskad i Italien den 7 juli 2026", "review_url": "https://www.amazon.se/gp/customer-reviews/R2RIBCLVXIU3MD", "first_seen_at": "27/08/2026"}, {"id": 60, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.pl", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Zrecenzowano we W\u0142oszech dnia 12 lipca 2026", "review_url": "https://www.amazon.pl/gp/customer-reviews/RSQSC0SMPNNCN", "first_seen_at": "27/08/2026"}, {"id": 59, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.pl", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Mattia B.", "review_date": "Zrecenzowano we W\u0142oszech dnia 7 lipca 2026", "review_url": "https://www.amazon.pl/gp/customer-reviews/R2RIBCLVXIU3MD", "first_seen_at": "27/08/2026"}, {"id": 58, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.co.uk", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Reviewed in Italy on 12 July 2026", "review_url": "https://www.amazon.co.uk/gp/customer-reviews/RSQSC0SMPNNCN", "first_seen_at": "27/08/2026"}, {"id": 57, "asin": "B0H6QFZBDS", "book_title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.co.uk", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Mattia B.", "review_date": "Reviewed in Italy on 7 July 2026", "review_url": "https://www.amazon.co.uk/gp/customer-reviews/R2RIBCLVXIU3MD", "first_seen_at": "27/08/2026"}, {"id": 49, "asin": "B0H7JK9R46", "book_title": "Leo la gru e il nido della cinciallegra: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.com.au", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Reviewed in Italy on 12 July 2026", "review_url": "https://www.amazon.com.au/gp/customer-reviews/R11E3VMNOMG9Z2", "first_seen_at": "27/08/2026"}, {"id": 48, "asin": "B0H7JK9R46", "book_title": "Leo la gru e il nido della cinciallegra: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.es", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Rese\u00f1ado en Italia el 12 de julio de 2026", "review_url": "https://www.amazon.es/gp/customer-reviews/R11E3VMNOMG9Z2", "first_seen_at": "27/08/2026"}, {"id": 47, "asin": "B0H7JK9R46", "book_title": "Leo la gru e il nido della cinciallegra: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.fr", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Avis laiss\u00e9 en Italie le 12 juillet 2026", "review_url": "https://www.amazon.fr/gp/customer-reviews/R11E3VMNOMG9Z2", "first_seen_at": "27/08/2026"}, {"id": 42, "asin": "B0H7JK9R46", "book_title": "Leo la gru e il nido della cinciallegra: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.it", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Michele L.", "review_date": "Recensito in Italia il 19 luglio 2026", "review_url": "https://www.amazon.it/gp/customer-reviews/R1EAQ3OJ48Y8FP", "first_seen_at": "27/08/2026"}, {"id": 41, "asin": "B0H7JK9R46", "book_title": "Leo la gru e il nido della cinciallegra: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.it", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "Erdunga", "review_date": "Recensito in Italia il 29 luglio 2026", "review_url": "https://www.amazon.it/gp/customer-reviews/R32429SMI9T5UY", "first_seen_at": "27/08/2026"}, {"id": 40, "asin": "B0H7JK9R46", "book_title": "Leo la gru e il nido della cinciallegra: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "marketplace": "amazon.it", "rating": 5.0, "stars": "\u2605\u2605\u2605\u2605\u2605", "title": "Valutazione a 5 stelle", "body": "", "author": "artigiani gabriele", "review_date": "Recensito in Italia il 12 luglio 2026", "review_url": "https://www.amazon.it/gp/customer-reviews/R11E3VMNOMG9Z2", "first_seen_at": "27/08/2026"}];
+    const ALL_BOOKS = [{"asin": "B0H7JK9R46", "title": "Leo la gru e il nido della cinciallegra: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "cover_image_url": "https://m.media-amazon.com/images/I/617Sbz0vwiL._SY522_.jpg", "price": "10,49 \u20ac", "has_kindle": true, "kindle_price": "3,49\u00a0\u20ac", "marketplaces": ["amazon.it", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 16, "avg_rating": 5.0, "ratings": [5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0]}, {"asin": "B0H6MN4LW7", "title": "Benny l'escavatore e la collina che cambiava forma: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "cover_image_url": "https://m.media-amazon.com/images/I/61sIFgU38NL._SY522_.jpg", "price": "10,49 \u20ac", "has_kindle": true, "kindle_price": "3,49\u00a0\u20ac", "marketplaces": ["amazon.it", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 4, "avg_rating": 5.0, "ratings": [5.0, 5.0, 5.0, 5.0]}, {"asin": "B0HF7WZBYD", "title": "Non Rompetemi i Coglioni: Il libro da colorare per sfogarsi senza finire nei guai | Libro antistress kawaii per adulti", "cover_image_url": "https://m.media-amazon.com/images/I/712FJzQH3UL._SY522_.jpg", "price": "EUR 9.52", "has_kindle": false, "kindle_price": "", "marketplaces": ["amazon.com", "amazon.it", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 0, "avg_rating": 5.0, "ratings": []}, {"asin": "B0HGGQ3GZ8", "title": "Killer Paws: A Cozy Murder Coloring Book | Darkly Humorous Murder Scenes in Cozy Everyday Settings for Adults and Teens (Cozy Coloring Chaos)", "cover_image_url": "https://m.media-amazon.com/images/I/61FmxMWDgkL._SY522_.jpg", "price": "12,19 \u20ac", "has_kindle": false, "kindle_price": "", "marketplaces": ["amazon.it", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 0, "avg_rating": 5.0, "ratings": []}, {"asin": "B0HFZZ2TMH", "title": "Impossible Worlds: Cozy & Easy Coloring Book | 46 Bold Designs of Cute Animals, Impossible Places & Whimsical Worlds Hidden Inside Everyday Objects (For Kids & Adults)", "cover_image_url": "https://m.media-amazon.com/images/I/61TSgZ6f6QL._SY522_.jpg", "price": "12,19 \u20ac", "has_kindle": true, "kindle_price": "Disponibile", "marketplaces": ["amazon.it", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 0, "avg_rating": 5.0, "ratings": []}, {"asin": "B0HFGBJW8Y", "title": "Innocent Paws: A Cozy Murder Coloring Book | Darkly Humorous Murder Scenes in Cozy Everyday Settings for Adults and Teens", "cover_image_url": "https://m.media-amazon.com/images/I/61JGIDDs9-L._SY522_.jpg", "price": "12,19 \u20ac", "has_kindle": false, "kindle_price": "", "marketplaces": ["amazon.it", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 0, "avg_rating": 5.0, "ratings": []}, {"asin": "B0HGJBKMGZ", "title": "Italian Girls: Cozy & Easy Coloring Book | Cute Italian Girls, Relaxing Coloring Pages, Italian Lifestyle, Fashion & Everyday Moments", "cover_image_url": "https://m.media-amazon.com/images/I/71ZGto0CFtL._SY522_.jpg", "price": "12,19 \u20ac", "has_kindle": false, "kindle_price": "", "marketplaces": ["amazon.it", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 0, "avg_rating": 5.0, "ratings": []}, {"asin": "B0H6XV8LN6", "title": "Rudy the bulldozer and the vanishing beach: Construction Site Adventures - Illustrated Book for Children Ages 2-5", "cover_image_url": "https://m.media-amazon.com/images/I/61jHraSScRL._SY522_.jpg", "price": "9,02 \u20ac", "has_kindle": true, "kindle_price": "3,46\u00a0\u20ac", "marketplaces": ["amazon.it", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 0, "avg_rating": 5.0, "ratings": []}, {"asin": "B0H6SDVJDZ", "title": "Bruno the truck and the duck pond: Construction Site Adventures - Illustrated Book for Children Ages 2-5", "cover_image_url": "https://m.media-amazon.com/images/I/618PT79kRtL._SY522_.jpg", "price": "9,02 \u20ac", "has_kindle": true, "kindle_price": "3,46\u00a0\u20ac", "marketplaces": ["amazon.it", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 0, "avg_rating": 5.0, "ratings": []}, {"asin": "B0H6XMYR8Q", "title": "Benny the excavator and the coins of ancient Rome: Construction Site Adventures - Illustrated Book for Children Ages 2-5", "cover_image_url": "https://m.media-amazon.com/images/I/61kIfKJA72L._SY522_.jpg", "price": "9,02 \u20ac", "has_kindle": true, "kindle_price": "3,46\u00a0\u20ac", "marketplaces": ["amazon.it", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 0, "avg_rating": 5.0, "ratings": []}, {"asin": "B0H6ZDZ2N8", "title": "Leo the crane and the mountain gems: Construction Site Adventures - Illustrated Book for Children Ages 2-5", "cover_image_url": "https://m.media-amazon.com/images/I/614sdLKKG+L._SY522_.jpg", "price": "9,02 \u20ac", "has_kindle": true, "kindle_price": "3,46\u00a0\u20ac", "marketplaces": ["amazon.it", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 0, "avg_rating": 5.0, "ratings": []}, {"asin": "B0H723KGZ5", "title": "Nina the cement truck and the bunny bridge: Construction Site Adventures - Illustrated Book for Children Ages 2-5", "cover_image_url": "https://m.media-amazon.com/images/I/61k6BjoCIcL._SY522_.jpg", "price": "9,02 \u20ac", "has_kindle": true, "kindle_price": "3,46\u00a0\u20ac", "marketplaces": ["amazon.it", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 0, "avg_rating": 5.0, "ratings": []}, {"asin": "B0H75N8JT9", "title": "Rino the roller and the construction site thieves: Construction Site Adventures - Illustrated Book for Children Ages 2-5", "cover_image_url": "https://m.media-amazon.com/images/I/61cVaK1voBL._SY522_.jpg", "price": "9,02 \u20ac", "has_kindle": true, "kindle_price": "3,46\u00a0\u20ac", "marketplaces": ["amazon.it", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 0, "avg_rating": 5.0, "ratings": []}, {"asin": "B0H7LPQ8KX", "title": "Leo the crane and the little bird's nest: Construction Site Adventures - Illustrated Book for Children Ages 2-5: Salucci, Marco: 9798185418413: Amazon.com: Books", "cover_image_url": "https://m.media-amazon.com/images/I/614jU5rEZdL._SY522_.jpg", "price": "9,02 \u20ac", "has_kindle": true, "kindle_price": "3,46\u00a0\u20ac", "marketplaces": ["amazon.it", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 0, "avg_rating": 5.0, "ratings": []}, {"asin": "B0H6SBPNM5", "title": "Benny the excavator and the shape-shifting hill: Construction Site Adventures \u2013 Illustrated Book for Children Ages 2-5", "cover_image_url": "https://m.media-amazon.com/images/I/61GvWpqdnIL._SY522_.jpg", "price": "10,96 \u20ac", "has_kindle": true, "kindle_price": "Disponibile", "marketplaces": ["amazon.it", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 0, "avg_rating": 5.0, "ratings": []}, {"asin": "B0H6MY4W6X", "title": "Leo la gru e le gemme della montagna: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "cover_image_url": "https://m.media-amazon.com/images/I/61miYgHMarL._SY522_.jpg", "price": "10,49 \u20ac", "has_kindle": true, "kindle_price": "3,49\u00a0\u20ac", "marketplaces": ["amazon.it", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 2, "avg_rating": 5.0, "ratings": [5.0, 5.0]}, {"asin": "B0H6VBNX5D", "title": "Benny l'escavatore e le monete dell'antica Roma: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "cover_image_url": "https://m.media-amazon.com/images/I/61IAJ+2eaPL._SY522_.jpg", "price": "10,49 \u20ac", "has_kindle": true, "kindle_price": "Disponibile", "marketplaces": ["amazon.it", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 15, "avg_rating": 5.0, "ratings": [5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0]}, {"asin": "B0H75DDGLQ", "title": "Rino il rullo e i ladri del cantiere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "cover_image_url": "https://m.media-amazon.com/images/I/61PlfmIzoXL._SY522_.jpg", "price": "10,49 \u20ac", "has_kindle": true, "kindle_price": "3,49\u00a0\u20ac", "marketplaces": ["amazon.it", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 1, "avg_rating": 5.0, "ratings": [5.0]}, {"asin": "B0H717X9ZL", "title": "Nina la betoniera e il ponte dei coniglietti: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "cover_image_url": "https://m.media-amazon.com/images/I/61YL7DVil4L._SY522_.jpg", "price": "10,49 \u20ac", "has_kindle": true, "kindle_price": "3,49\u00a0\u20ac", "marketplaces": ["amazon.it", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 0, "avg_rating": 5.0, "ratings": []}, {"asin": "B0H6Q5TX7M", "title": "Rudy la ruspa e la spiaggia che scompariva: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "cover_image_url": "https://m.media-amazon.com/images/I/61xgujIXjIL._SY522_.jpg", "price": "10,49 \u20ac", "has_kindle": true, "kindle_price": "Disponibile", "marketplaces": ["amazon.it", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 0, "avg_rating": 5.0, "ratings": []}, {"asin": "B0H6QFZBDS", "title": "Bruno il camion e lo stagno delle papere: Le Avventure del Cantiere - Libro illustrato per bambini 2-5 anni", "cover_image_url": "https://m.media-amazon.com/images/I/616WKkgM5hL._SY522_.jpg", "price": "10,49 \u20ac", "has_kindle": true, "kindle_price": "Disponibile", "marketplaces": ["amazon.it", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 31, "avg_rating": 5.0, "ratings": [5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0]}, {"asin": "B0HD2X6HVJ", "title": "Fano col naso all'ins\u00f9: La citt\u00e0 di Vitruvio da scoprire e colorare | Libro da colorare con oltre 40 disegni, giochi e attivit\u00e0 creative per bambini 5-10 anni", "cover_image_url": "https://m.media-amazon.com/images/I/71HdJydNqaL._SY522_.jpg", "price": "9,48 \u20ac", "has_kindle": false, "kindle_price": "", "marketplaces": ["amazon.it", "amazon.com", "amazon.co.uk", "amazon.de", "amazon.fr", "amazon.es", "amazon.nl", "amazon.pl", "amazon.se", "amazon.com.be", "amazon.ie", "amazon.co.jp", "amazon.ca", "amazon.com.au"], "reviews_count": 12, "avg_rating": 5.0, "ratings": [5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0]}];
+
+    function renderReviews(items) {
+      const container = document.getElementById("reviewsList");
+      document.getElementById("reviewsCountBadge").innerText = items.length + " elementi";
+      
+      if (items.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full py-16 text-center glass-card rounded-2xl">
+            <div class="text-4xl mb-2">🔍</div>
+            <p class="text-slate-400 text-sm font-medium">Nessuna recensione corrispondente ai filtri impostati.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = items.map(r => `
+        <div class="glass-card rounded-2xl p-5 flex flex-col justify-between hover:border-slate-600 transition">
+          <div>
+            <div class="flex items-start justify-between gap-3 mb-2">
+              <div>
+                <span class="text-amber-400 font-mono tracking-wider font-bold text-sm">${r.stars}</span>
+                <span class="text-xs font-bold text-slate-300 ml-1.5">${r.rating}/5</span>
+              </div>
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+                ${r.marketplace}
+              </span>
+            </div>
+
+            <h4 class="font-bold text-slate-100 text-sm mb-1 line-clamp-1">${r.title}</h4>
+            <div class="text-[11px] text-slate-400 mb-3">
+              Recensito da <strong class="text-slate-300">${r.author}</strong> ${r.review_date ? 'il ' + r.review_date : ''}
+            </div>
+
+            <p class="text-xs text-slate-300/90 whitespace-pre-wrap leading-relaxed mb-4">${r.body}</p>
+          </div>
+
+          <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+            <span class="text-slate-400 font-medium truncate max-w-[200px]" title="${r.book_title}">
+              📖 ${r.book_title}
+            </span>
+            <a href="${r.review_url}" target="_blank" class="text-emerald-400 hover:text-emerald-300 font-semibold inline-flex items-center gap-1 transition">
+              <span>Vedi su Amazon</span>
+              <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+            </a>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderBooks(items) {
+      const container = document.getElementById("booksList");
+      document.getElementById("booksCountBadge").innerText = items.length + " titoli";
+
+      if (items.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full py-16 text-center glass-card rounded-2xl">
+            <div class="text-4xl mb-2">📚</div>
+            <p class="text-slate-400 text-sm font-medium">Nessun libro trovato.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = items.map(b => `
+        <div class="glass-card rounded-2xl p-5 flex flex-col justify-between hover:border-slate-600 transition">
+          <div class="flex gap-4 items-start">
+            <img src="${b.cover_image_url}" alt="Cover" class="w-20 h-28 object-cover rounded-lg shadow-md bg-slate-900 border border-slate-800 flex-shrink-0" onerror="this.src='https://via.placeholder.com/80x110?text=KDP'">
+            <div class="flex-1 min-w-0">
+              <h4 class="font-bold text-white text-sm line-clamp-2 mb-1" title="${b.title}">${b.title}</h4>
+              <div class="text-xs text-slate-400 font-mono mb-2">ASIN: ${b.asin}</div>
+              
+              <div class="flex items-center gap-1.5 text-xs">
+                <span class="text-amber-400 font-bold">${b.avg_rating} ★</span>
+                <span class="text-slate-400">(${b.reviews_count} recensioni)</span>
+              </div>
+
+              ${b.price ? `<div class="mt-2 text-xs font-semibold text-emerald-400">Cartaceo: ${b.price}</div>` : ''}
+              ${b.has_kindle ? `<div class="text-xs text-blue-400">Kindle: ${b.kindle_price || 'Disponibile'}</div>` : ''}
+            </div>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
+            <span class="text-[11px] text-slate-400">${b.marketplaces.length} store monitorati</span>
+            <a href="https://www.amazon.it/dp/${b.asin}" target="_blank" class="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-semibold text-xs inline-flex items-center gap-1.5 transition">
+              <span>Scheda Amazon</span>
+              <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+            </a>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function filterData() {
+      const query = document.getElementById("searchInput").value.toLowerCase().trim();
+      const mkt = document.getElementById("marketplaceFilter").value;
+      const stars = document.getElementById("starsFilter").value;
+
+      // Filter reviews
+      const filteredRevs = ALL_REVIEWS.filter(r => {
+        const matchQuery = !query || r.title.toLowerCase().includes(query) || r.body.toLowerCase().includes(query) || r.author.toLowerCase().includes(query) || r.asin.toLowerCase().includes(query) || r.book_title.toLowerCase().includes(query);
+        const matchMkt = !mkt || r.marketplace === mkt;
+        let matchStars = true;
+        if (stars === "5") matchStars = r.rating >= 4.7;
+        else if (stars === "4") matchStars = r.rating >= 3.7 && r.rating < 4.7;
+        else if (stars === "3") matchStars = r.rating < 3.7;
+        return matchQuery && matchMkt && matchStars;
+      });
+
+      renderReviews(filteredRevs);
+
+      // Filter books
+      const filteredBooks = ALL_BOOKS.filter(b => {
+        const matchQuery = !query || b.title.toLowerCase().includes(query) || b.asin.toLowerCase().includes(query);
+        const matchMkt = !mkt || b.marketplaces.includes(mkt);
+        return matchQuery && matchMkt;
+      });
+
+      renderBooks(filteredBooks);
+    }
+
+    function switchView(tab) {
+      if (tab === "books") {
+        document.getElementById("booksContainer").classList.remove("hidden");
+        document.getElementById("reviewsContainer").classList.add("hidden");
+      } else {
+        document.getElementById("booksContainer").classList.add("hidden");
+        document.getElementById("reviewsContainer").classList.remove("hidden");
+      }
+    }
+
+    // Initial render
+    renderReviews(ALL_REVIEWS);
+    renderBooks(ALL_BOOKS);
+  </script>
+
+</body>
+</html>
