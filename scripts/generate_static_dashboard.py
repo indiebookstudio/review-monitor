@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
 Generates the clean, table-based, sortable KDP dashboard for GitHub Pages
-with marketplace switcher bar and sortable columns.
+with marketplace switcher bar and perfectly sortable columns.
 Outputs to docs/index.html.
 """
 import os
 import sys
+import re
 import json
 import datetime
 from pathlib import Path
@@ -15,8 +16,66 @@ sys.path.insert(0, str(BASE_DIR))
 
 from app.database import SessionLocal
 from app.models import Book, Review
-from app.reviews.statistics import get_dashboard_kpis, format_compact_date
+from app.reviews.statistics import get_dashboard_kpis
 from app.amazon.marketplace import MARKETPLACES
+
+MONTHS_MAP = {
+    # Italian
+    'gennaio': '01', 'febbraio': '02', 'marzo': '03', 'aprile': '04', 'maggio': '05', 'giugno': '06',
+    'luglio': '07', 'agosto': '08', 'settembre': '09', 'ottobre': '10', 'novembre': '11', 'dicembre': '12',
+    # English
+    'january': '01', 'february': '02', 'march': '03', 'april': '04', 'may': '05', 'june': '06',
+    'july': '07', 'august': '08', 'september': '09', 'october': '10', 'november': '11', 'december': '12',
+    'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'jun': '06', 'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12',
+    # French
+    'janvier': '01', 'février': '02', 'fevrier': '02', 'mars': '03', 'avril': '04', 'mai': '05', 'juin': '06',
+    'juillet': '07', 'août': '08', 'aout': '08', 'septembre': '09', 'octobre': '10', 'novembre': '11', 'décembre': '12', 'decembre': '12',
+    # German
+    'januar': '01', 'februar': '02', 'märz': '03', 'maerz': '03', 'april': '04', 'mai': '05', 'juni': '06', 'juli': '07', 'august': '08', 'september': '09', 'oktober': '10', 'november': '11', 'dezember': '12',
+    # Spanish
+    'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04', 'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08', 'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12',
+    # Polish
+    'stycznia': '01', 'lutego': '02', 'marca': '03', 'kwietnia': '04', 'maja': '05', 'czerwca': '06', 'lipca': '07', 'sierpnia': '08', 'września': '09', 'wrzesnia': '09', 'października': '10', 'pazdziernika': '10', 'listopada': '11', 'grudnia': '12',
+    # Dutch
+    'januari': '01', 'februari': '02', 'maart': '03', 'mei': '05', 'augustus': '08',
+    # Swedish & Portuguese
+    'augusti': '08', 'janeiro': '01', 'fevereiro': '02', 'março': '03', 'marco': '03', 'junho': '06', 'julho': '07',
+}
+
+def parse_clean_review_date(date_str: str) -> tuple:
+    if not date_str or str(date_str).strip() in ('N/A', '-', 'None', ''):
+        return ('-', 0)
+    cleaned = str(date_str).lower().strip()
+    
+    # Japanese format: 2026年7月12日
+    m_jp = re.search(r'(\d{4})年(\d{1,2})月(\d{1,2})日', cleaned)
+    if m_jp:
+        y, m, d = m_jp.groups()
+        return (f'{int(d):02d}/{int(m):02d}/{y}', int(f'{y}{int(m):02d}{int(d):02d}'))
+        
+    # European style: DD Month YYYY (e.g. 12 luglio 2026, 12 de julio de 2026, 12 juillet 2026, op 10 augustus 2026)
+    m_eu = re.search(r'(\d{1,2})\.?(?:\s+de|\s+d\'|\s+du|\s+dnia|\s+den|\s+le|\s+il|\s+on|\s+am|\s+op)?\s+([a-zà-ÿ]+)\.?(?:\s+de|\s+del)?\s+(\d{4})', cleaned)
+    if m_eu:
+        day, m_name, year = m_eu.groups()
+        m_num = MONTHS_MAP.get(m_name.strip('.'))
+        if m_num:
+            return (f'{int(day):02d}/{m_num}/{year}', int(f'{year}{m_num}{int(day):02d}'))
+            
+    # English style: Month DD, YYYY (e.g. August 2, 2026)
+    m_en = re.search(r'([a-z]+)\.?\s+(\d{1,2}),?\s+(\d{4})', cleaned)
+    if m_en:
+        m_name, day, year = m_en.groups()
+        m_num = MONTHS_MAP.get(m_name.strip('.'))
+        if m_num:
+            return (f'{int(day):02d}/{m_num}/{year}', int(f'{year}{m_num}{int(day):02d}'))
+
+    # ISO fallback YYYY-MM-DD
+    m_iso = re.search(r'(\d{4})-(\d{2})-(\d{2})', cleaned)
+    if m_iso:
+        y, m, d = m_iso.groups()
+        return (f'{d}/{m}/{y}', int(f'{y}{m}{d}'))
+        
+    return ('-', 0)
 
 def format_stars(rating: float) -> str:
     full = int(round(rating or 5.0))
@@ -65,31 +124,44 @@ def generate_static_html(output_path: Path) -> str:
             # Reviews in last 30d
             new_30d = sum(1 for r in b_revs if r.first_seen_at and r.first_seen_at.replace(tzinfo=datetime.timezone.utc) >= d30)
             
-            # Last review date
-            last_date = "-"
+            # Last review date clean formatting
+            last_date_display = "-"
+            last_date_ts = 0
+            
             if b_revs:
-                # get newest review
-                sorted_revs = sorted(b_revs, key=lambda x: x.first_seen_at or datetime.datetime.min, reverse=True)
-                if sorted_revs and sorted_revs[0].review_date:
-                    last_date = sorted_revs[0].review_date
+                # find review with latest parsed date timestamp or first_seen_at
+                best_ts = 0
+                best_display = "-"
+                for r in b_revs:
+                    d_disp, d_ts = parse_clean_review_date(r.review_date)
+                    if d_ts > best_ts:
+                        best_ts = d_ts
+                        best_display = d_disp
+                    elif best_ts == 0 and r.first_seen_at:
+                        best_display = r.first_seen_at.strftime("%d/%m/%Y")
+                        best_ts = int(r.first_seen_at.strftime("%Y%m%d"))
+                last_date_display = best_display
+                last_date_ts = best_ts
 
             m_meta = MARKETPLACES.get(b.marketplace, {})
             country = m_meta.get("country", "it")
             mkt_code = m_meta.get("code", b.marketplace.replace("amazon.", "").upper())
 
-            serialized_revs = [
-                {
+            serialized_revs = []
+            for r in b_revs:
+                r_disp, r_ts = parse_clean_review_date(r.review_date)
+                if r_disp == "-" and r.first_seen_at:
+                    r_disp = r.first_seen_at.strftime("%d/%m/%Y")
+                serialized_revs.append({
                     "id": r.review_id,
                     "rating": r.rating or 5.0,
                     "stars": format_stars(r.rating or 5.0),
                     "title": r.title or "Recensione",
                     "author": r.author or "Cliente Amazon",
-                    "date": r.review_date or "",
+                    "date": r_disp,
                     "body": r.body or "",
                     "url": r.review_url or f"https://www.{b.marketplace}/dp/{b.asin}"
-                }
-                for r in b_revs
-            ]
+                })
 
             table_rows.append({
                 "id": b.id,
@@ -105,13 +177,13 @@ def generate_static_html(output_path: Path) -> str:
                 "reviews_count": rev_count,
                 "avg_rating": avg_rating,
                 "new_30d": new_30d,
-                "last_date": last_date,
+                "last_date": last_date_display,
+                "last_date_ts": last_date_ts,
                 "product_url": f"https://www.{b.marketplace}/dp/{b.asin}",
                 "reviews": serialized_revs
             })
 
         table_rows_json = json.dumps(table_rows)
-        mkt_counts_json = json.dumps(mkt_counts)
 
         html_content = f"""<!DOCTYPE html>
 <html lang="it">
@@ -135,7 +207,6 @@ def generate_static_html(output_path: Path) -> str:
       --emerald: #10b981;
       --amber: #f59e0b;
       --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.07);
     }}
 
     * {{ box-sizing: border-box; margin: 0; padding: 0; }}
@@ -409,9 +480,9 @@ def generate_static_html(output_path: Path) -> str:
       color: #94a3b8;
     }}
 
-    th.sorted-asc .sort-indicator::after {{ content: ' ▲'; color: #0284c7; }}
-    th.sorted-desc .sort-indicator::after {{ content: ' ▼'; color: #0284c7; }}
-    th:not(.sorted-asc):not(.sorted-desc) .sort-indicator::after {{ content: ' ⇅'; opacity: 0.4; }}
+    th.sorted-asc .sort-indicator::after {{ content: ' ▲'; color: #0284c7; font-weight: 800; }}
+    th.sorted-desc .sort-indicator::after {{ content: ' ▼'; color: #0284c7; font-weight: 800; }}
+    th:not(.sorted-asc):not(.sorted-desc) .sort-indicator::after {{ content: ' ⇅'; opacity: 0.35; }}
 
     table.kdp-table td {{
       padding: 12px 14px;
@@ -496,6 +567,13 @@ def generate_static_html(output_path: Path) -> str:
       white-space: nowrap;
     }}
 
+    .date-badge {{
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #334155;
+      white-space: nowrap;
+    }}
+
     .btn-amazon {{
       display: inline-flex;
       align-items: center;
@@ -542,12 +620,10 @@ def generate_static_html(output_path: Path) -> str:
       max-width: 680px;
       max-height: 85vh;
       display: flex;
-      flex-col: column;
+      flex-direction: column;
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
       border: 1px solid var(--border-color);
       overflow: hidden;
-      display: flex;
-      flex-direction: column;
     }}
 
     .modal-header {{
@@ -712,7 +788,7 @@ def generate_static_html(output_path: Path) -> str:
               <th onclick="sortTable(5, 'number')" style="width: 85px; text-align: center;">Recensioni <span class="sort-indicator"></span></th>
               <th onclick="sortTable(6, 'number')" style="width: 85px; text-align: center;">Rating <span class="sort-indicator"></span></th>
               <th onclick="sortTable(7, 'number')" style="width: 75px; text-align: center;">+30gg <span class="sort-indicator"></span></th>
-              <th onclick="sortTable(8, 'string')" style="width: 110px; text-align: center;">Ultima Rec. <span class="sort-indicator"></span></th>
+              <th onclick="sortTable(8, 'date')" style="width: 115px; text-align: center;">Ultima Rec. <span class="sort-indicator"></span></th>
               <th class="no-sort" style="width: 90px; text-align: center;">Amazon</th>
             </tr>
           </thead>
@@ -770,7 +846,7 @@ def generate_static_html(output_path: Path) -> str:
         else if (currentSortCol === 5) {{ valA = a.reviews_count; valB = b.reviews_count; }}
         else if (currentSortCol === 6) {{ valA = a.avg_rating; valB = b.avg_rating; }}
         else if (currentSortCol === 7) {{ valA = a.new_30d; valB = b.new_30d; }}
-        else if (currentSortCol === 8) {{ valA = a.last_date; valB = b.last_date; }}
+        else if (currentSortCol === 8) {{ valA = a.last_date_ts; valB = b.last_date_ts; }}
         else {{ valA = a.id; valB = b.id; }}
 
         if (typeof valA === 'string') {{
@@ -832,7 +908,9 @@ def generate_static_html(output_path: Path) -> str:
             ${{r.new_30d > 0 ? `<span style="color: #16a34a; font-weight: 800; background: #dcfce7; padding: 2px 6px; border-radius: 999px; font-size: 0.78rem;">+${{r.new_30d}}</span>` : '<span style="color: #94a3b8;">0</span>'}}
           </td>
 
-          <td style="text-align: center; font-size: 0.78rem; color: #64748b;">${{r.last_date}}</td>
+          <td style="text-align: center;">
+            <span class="date-badge">${{r.last_date}}</span>
+          </td>
 
           <td style="text-align: center;">
             <a href="${{r.product_url}}" target="_blank" class="btn-amazon">
@@ -897,7 +975,7 @@ def generate_static_html(output_path: Path) -> str:
               <a href="${{r.url}}" target="_blank" style="font-size: 0.78rem; color: #0284c7; font-weight: 700; text-decoration: underline;">Vedi su Amazon ↗</a>
             </div>
             <div class="review-title">${{r.title}}</div>
-            <div class="review-meta">Scritta da <strong>${{r.author}}</strong> ${{r.date ? 'il ' + r.date : ''}}</div>
+            <div class="review-meta">Scritta da <strong>${{r.author}}</strong> &bull; Data: <strong>${{r.date}}</strong></div>
             <div class="review-text">${{r.body}}</div>
           </div>
         `).join('');
@@ -910,7 +988,7 @@ def generate_static_html(output_path: Path) -> str:
       document.getElementById("reviewsModal").classList.remove("open");
     }}
 
-    // Initial table render
+    // Initial table render: sorted by date descending if wanted or by reviews
     sortTable(5, 'number'); // Default sort by reviews count descending
   </script>
 
