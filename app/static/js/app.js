@@ -494,15 +494,18 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         if (addSubmitBtn) {
           addSubmitBtn.disabled = false;
-          addSubmitBtn.textContent = `✓ CONFERMA E AGGIUNGI IN TABELLA (${data.found_count || 14} Marketplace)`;
+          addSubmitBtn.textContent = `✓ Aggiungi Libro (${data.found_count || 14} Store Rilevati)`;
           addSubmitBtn.className = "btn btn-primary";
         }
       }
 
     } catch (err) {
-      alert("Errore durante la scansione dell'ASIN: " + err.message);
+      console.warn("Scan warning:", err.message);
       if (scannerStatus) scannerStatus.classList.remove("active");
-      if (addSubmitBtn) addSubmitBtn.disabled = false;
+      if (addSubmitBtn) {
+        addSubmitBtn.disabled = false;
+        addSubmitBtn.textContent = "+ Aggiungi Libro";
+      }
     } finally {
       isScanning = false;
       if (scanBtn) {
@@ -520,12 +523,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (asinInput) {
-    asinInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        performAsinScan();
-      }
-    });
     asinInput.addEventListener("paste", () => {
       setTimeout(performAsinScan, 200);
     });

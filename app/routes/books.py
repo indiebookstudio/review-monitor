@@ -615,7 +615,7 @@ async def force_check_asin_all_stores(asin: str, request: Request, db: Session =
     )
 
 @router.post("/asin/{asin}/delete")
-async def delete_asin_all_marketplaces(asin: str, db: Session = Depends(get_db)):
+async def delete_asin_all_marketplaces(asin: str, request: Request, db: Session = Depends(get_db)):
     """Deletes all book records for this ASIN across all 14 marketplace stores."""
     clean_asin = validate_asin(asin)
     books = db.query(Book).filter(Book.asin == clean_asin).all()
@@ -634,8 +634,10 @@ async def delete_asin_all_marketplaces(asin: str, db: Session = Depends(get_db))
     db.add(audit)
     db.commit()
     
+    referer = request.headers.get("referer", "/")
+    redirect_base = "/" if "books" not in referer else "/books"
     return RedirectResponse(
-        url=f"/?msg=Libro '{title}' ({clean_asin}) eliminato con successo da tutti i {count} marketplace!",
+        url=f"{redirect_base}?msg=Libro '{title}' ({clean_asin}) eliminato con successo da tutti i {count} marketplace!",
         status_code=status.HTTP_303_SEE_OTHER
     )
 

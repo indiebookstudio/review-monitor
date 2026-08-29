@@ -196,10 +196,11 @@
 
               <button 
                 class="btn btn-danger btn-sm" 
-                style="padding: 3px 6px; font-size: 0.78rem;"
-                onclick="openDeleteBookModal('{{ item.book.id }}', '{{ item.book.title | escape }}', '{{ item.book.asin }}')"
-                title="Elimina solo questa voce">
-                ❌
+                style="padding: 3px 8px; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 3px;"
+                onclick="openDeleteAllStoresModal('{{ item.book.asin }}', '{{ item.book.title | escape }}')"
+                title="Elimina libro e storico recensioni da tutti i 14 marketplace">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                Elimina
               </button>
             </div>
           </td>
@@ -220,7 +221,10 @@
 <div class="modal-overlay" id="addBookModal">
   <div class="modal-content" style="max-width: 580px;">
     <div class="modal-header">
-      <h3 class="modal-title">📖 Aggiungi Libro KDP</h3>
+      <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+        Aggiungi Libro KDP (Solo ASIN)
+      </h3>
       <button class="modal-close" onclick="closeModal('addBookModal')">&times;</button>
     </div>
     <form action="/books/add" method="POST" id="addBookForm">
@@ -232,32 +236,34 @@
       <input type="hidden" name="selected_marketplaces" id="hidden_selected_marketplaces" value="all">
 
       <div class="form-group">
-        <label for="asin" class="form-label">Codice ASIN Amazon (o link del libro):</label>
+        <label for="asin" class="form-label" style="font-weight: 700; font-size: 0.95rem; margin-bottom: 6px;">
+          Codice ASIN Amazon (o link del libro):
+        </label>
         <div style="display: flex; gap: 8px;">
           <input 
             type="text" 
             id="asin" 
             name="asin" 
             class="form-control" 
-            placeholder="es. B0H6MN4LW7" 
+            placeholder="es. B0H6MN4LW7 (oppure incolla link Amazon)" 
             required 
-            maxlength="100"
-            style="font-size: 1.15rem; font-weight: 700; letter-spacing: 1px;"
+            maxlength="120"
+            style="font-size: 1.15rem; font-weight: 700; letter-spacing: 0.5px;"
             autofocus
           >
           <button type="button" class="btn btn-secondary" id="scanAsinBtn" style="white-space: nowrap; font-weight: 700;">
             🔍 Cerca
           </button>
         </div>
-        <div style="font-size: 0.82rem; color: var(--text-subtle); margin-top: 6px;">
-          ✨ <strong>Zero fatica:</strong> Inserisci solo l'ASIN. Verranno scaricati copertina, titolo reale, prezzo cartaceo, disponibilità versione Kindle e tutti i 14 marketplace Amazon!
+        <div style="font-size: 0.82rem; color: var(--text-subtle); margin-top: 8px; line-height: 1.4;">
+          💡 <strong>Nessun altro campo richiesto:</strong> Inserisci solo l'ASIN. Verranno scaricati copertina, titolo reale, prezzi cartaceo/Kindle e tutti i <strong>14 marketplace Amazon</strong>!
         </div>
       </div>
 
       <!-- Live Loading State Animation -->
       <div class="scanner-status-box" id="scannerStatusBox">
         <div style="display: flex; align-items: center; gap: 10px; font-size: 0.92rem; font-weight: 600; color: #0284c7;">
-          <span>🌐 Ricerca e download informazioni in corso su tutti i 14 marketplace Amazon...</span>
+          <span>🌐 Ricerca e rilevamento informazioni in corso su tutti i 14 marketplace Amazon...</span>
         </div>
         <div class="scanner-progress-bar">
           <div class="scanner-progress-bar-fill"></div>
@@ -267,11 +273,11 @@
       <!-- Live Downloaded Metadata Preview Card -->
       <div class="scan-result-card" id="scanResultCard">
         <div style="display: flex; gap: 16px; align-items: flex-start;">
-          <div class="book-thumb-wrapper" style="width: 70px; height: 95px;">
+          <div class="book-thumb-wrapper" style="width: 70px; height: 95px; flex-shrink: 0;">
             <img id="previewCoverImg" src="" alt="Copertina" class="book-thumb-img" style="display: none;" />
             <div id="previewCoverFallback" class="book-thumb-fallback" style="font-size: 2.2rem; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">📚</div>
           </div>
-          <div style="flex: 1;">
+          <div style="flex: 1; min-width: 0;">
             <div id="previewTitle" style="font-size: 1rem; font-weight: 800; color: #0f172a; margin-bottom: 6px; line-height: 1.35;"></div>
             <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px;">
               <span id="previewPrice" class="price-tag"></span>
@@ -287,7 +293,7 @@
 
       <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;">
         <button type="button" class="btn btn-secondary" onclick="closeModal('addBookModal')">Annulla</button>
-        <button type="submit" class="btn btn-primary" id="addBookSubmitBtn" style="padding: 10px 24px; font-weight: 700;">+ AGGIUNGI IN TABELLA</button>
+        <button type="submit" class="btn btn-primary" id="addBookSubmitBtn" style="padding: 10px 24px; font-weight: 700;">+ Aggiungi Libro</button>
       </div>
     </form>
   </div>
