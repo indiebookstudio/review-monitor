@@ -2,8 +2,8 @@ name: KDP Review Monitor
 
 on:
   schedule:
-    # Esegue ogni notte alle 03:00 UTC (04:00/05:00 ora italiana) per avere le notifiche al mattino
-    - cron: '0 3 * * *'
+    # Esegue ogni notte alle 03:25 UTC (04:25/05:25 ora italiana) per avere le notifiche pronte al mattino
+    - cron: '25 3 * * *'
   workflow_dispatch: # Avvio manuale su richiesta da interfaccia GitHub o app mobile
 
 concurrency:
@@ -19,6 +19,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -51,6 +53,11 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git pull --rebase origin master || true
           git add data/kdp_monitor.db docs/index.html
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update KDP review database and GitHub Pages [skip ci]" && git push)
+          if ! git diff --staged --quiet; then
+            git commit -m "Auto-update KDP review database and GitHub Pages [skip ci]"
+            git pull --rebase origin master
+            git push origin master
+          else
+            echo "No changes in database or dashboard to commit."
+          fi
