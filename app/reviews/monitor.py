@@ -82,47 +82,25 @@ def run_book_check(
     db: Session, 
     client: Optional[AmazonClient] = None,
     force_alert: bool = False,
-    send_email_immediately: bool = False
+    send_email_immediately: bool = False,
+    max_retries: int = 2
 ) -> Dict[str, Any]:
     if client is None:
         client = AmazonClient()
 
     logger.info(f"Checking book: '{book.title}' (ASIN: {book.asin}, Marketplace: {book.marketplace})")
     
-    html, http_status, http_err = client.fetch_reviews_page(book.asin, book.marketplace)
-    
-    if not html or http_status != 200:
-        error_msg = http_err or f"HTTP status {http_status}"
-        logger.error(f"Amazon page unavailable for {book.asin}: {error_msg}")
-        check_run = CheckRun(
-            book_id=book.id,
-            asin=book.asin,
-            marketplace=book.marketplace,
-            checked_at=datetime.datetime.now(datetime.timezone.utc),
-            success=False,
-            reviews_found=0,
-            new_reviews=0,
-            status_code=STATUS_PAGE_UNAVAILABLE,
-            error_message=error_msg
-        )
-        db.add(check_run)
-        db.commit()
-        return {
-            "success": False,
-            "status": STATUS_PAGE_UNAVAILABLE,
-            "reviews_found": 0,
-            "new_reviews": 0,
-            "new_reviews_list": [],
-            "book_title": book.title,
-            "marketplace": book.marketplace,
-            "asin": book.asin,
-            "is_bootstrap": False,
-            "email_sent": False,
-            "error": error_msg
-        }
+    parsed = None
+    for attempt in range(1, max_retries + 1):
+        parsed = client.fetch_all_reviews_for_book(book.asin, book.marketplace, max_pages=5)
+        if parsed.get("status") != STATUS_PAGE_UNAVAILABLE and parsed.get("status") != STATUS_PARSER_ERROR:
+            break
+        if attempt < max_retries:
+            logger.warning(f"Check attempt {attempt} failed for {book.asin} on {book.marketplace}. Retrying in 2s...")
+            import time
+            time.sleep(2.0)
 
-    parsed = parse_amazon_reviews(html, asin=book.asin, marketplace=book.marketplace)
-    status_code = parsed["status"]
+    status_code = parsed.get("status", STATUS_PAGE_UNAVAILABLE)
     
     # Synchronize cover image, product title, price and Kindle info
     updated_fields = False
@@ -160,7 +138,7 @@ def run_book_check(
     
     if status_code == STATUS_PAGE_UNAVAILABLE or status_code == STATUS_PARSER_ERROR:
         error_msg = parsed.get("error") or "Parser failed or blocked"
-        logger.error(f"Failed parsing reviews for {book.asin}: {error_msg}")
+        logger.error(f"Failed parsing reviews for {book.asin} ({book.marketplace}): {error_msg}")
         check_run = CheckRun(
             book_id=book.id,
             asin=book.asin,
@@ -188,9 +166,9 @@ def run_book_check(
             "error": error_msg
         }
 
-    reviews_list = parsed["reviews"]
+    reviews_list = parsed.get("reviews", [])
     reviews_found_count = len(reviews_list)
-    logger.info(f"Parsed {reviews_found_count} reviews from Amazon for {book.asin}")
+    logger.info(f"Retrieved {reviews_found_count} total reviews from Amazon for '{book.title}' on {book.marketplace}")
 
     # Check if this is the first run for this book (Bootstrap)
     existing_count = db.query(Review).filter(Review.book_id == book.id).count()
@@ -260,16 +238,17 @@ def run_book_check(
             all_ratings = [r[0] for r in ratings_tuples if r[0] is not None]
             avg_rating = round(sum(all_ratings) / len(all_ratings), 1) if all_ratings else 5.0
             
-            # Send immediate email alert if requested (or when called standalone)
-            email_sent = send_review_alert(
-                book.title,
-                book.marketplace,
-                book.asin,
-                new_reviews_objects,
-                db,
-                total_in_db,
-                avg_rating
-            )
+            # Send immediate email alert if requested
+            if send_email_immediately:
+                email_sent = send_review_alert(
+                    book.title,
+                    book.marketplace,
+                    book.asin,
+                    new_reviews_objects,
+                    db,
+                    total_in_db,
+                    avg_rating
+                )
 
     check_run = CheckRun(
         book_id=book.id,
@@ -314,28 +293,58 @@ def run_all_checks(db: Session, force: bool = False, client: Optional[AmazonClie
     total_new = 0
     total_emails = 0
     digest_groups = []
+    failed_books: List[Book] = []
 
     if client is None:
         client = AmazonClient()
 
+    # Pass 1: Check all books
     for book in books:
         res = run_book_check(book, db, client, force_alert=force_alert, send_email_immediately=False)
-        results.append({
-            "book_id": book.id,
-            "title": book.title,
-            "asin": book.asin,
-            "marketplace": book.marketplace,
-            "result": res
-        })
-        n_revs = res.get("new_reviews_list", [])
-        if n_revs:
-            digest_groups.append({
+        if not res.get("success"):
+            failed_books.append(book)
+        else:
+            results.append({
+                "book_id": book.id,
                 "title": book.title,
-                "marketplace": book.marketplace,
                 "asin": book.asin,
-                "reviews": n_revs
+                "marketplace": book.marketplace,
+                "result": res
             })
-        total_new += res.get("new_reviews", 0)
+            n_revs = res.get("new_reviews_list", [])
+            if n_revs:
+                digest_groups.append({
+                    "title": book.title,
+                    "marketplace": book.marketplace,
+                    "asin": book.asin,
+                    "reviews": n_revs
+                })
+            total_new += res.get("new_reviews", 0)
+
+    # Pass 2: Automatic retry for any book that failed in Pass 1
+    if failed_books:
+        logger.info(f"Retrying {len(failed_books)} book(s) with deep stealth Playwright...")
+        import time
+        time.sleep(3.0)
+        deep_client = AmazonClient(use_playwright=True)
+        for book in failed_books:
+            retry_res = run_book_check(book, db, deep_client, force_alert=force_alert, send_email_immediately=False, max_retries=2)
+            results.append({
+                "book_id": book.id,
+                "title": book.title,
+                "asin": book.asin,
+                "marketplace": book.marketplace,
+                "result": retry_res
+            })
+            n_revs = retry_res.get("new_reviews_list", [])
+            if n_revs:
+                digest_groups.append({
+                    "title": book.title,
+                    "marketplace": book.marketplace,
+                    "asin": book.asin,
+                    "reviews": n_revs
+                })
+            total_new += retry_res.get("new_reviews", 0)
 
     update_check_schedule_timestamps(db)
 

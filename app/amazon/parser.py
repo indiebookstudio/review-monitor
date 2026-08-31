@@ -46,6 +46,16 @@ def is_blocked_or_unavailable(html: str, soup: BeautifulSoup) -> bool:
        "type the characters you see in this image" in html_lower:
         return True
     
+    # Sign-in redirects / Auth walls
+    if "ap/signin" in html_lower or \
+       "openid.return_to" in html_lower or \
+       "accedi o crea un account" in html_lower:
+        title_tag = soup.find("title")
+        if title_tag:
+            t_text = title_tag.get_text(strip=True).lower()
+            if any(s in t_text for s in ["accedi", "sign in", "sign-in", "anmelden", "identifiez-vous", "iniciar sesión", "inicia sesión"]):
+                return True
+
     # Amazon Dog / 404 / Unavailable
     if "looking for something?" in html_lower or \
        "dogs of amazon" in html_lower or \

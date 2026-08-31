@@ -12,7 +12,11 @@ from app.amazon.parser import (
     extract_cover_image,
     extract_product_price,
     extract_kindle_details,
-    is_blocked_or_unavailable
+    is_blocked_or_unavailable,
+    STATUS_OK,
+    STATUS_NO_REVIEWS,
+    STATUS_PAGE_UNAVAILABLE,
+    STATUS_PARSER_ERROR
 )
 from app.config import settings
 
@@ -63,86 +67,226 @@ class AmazonClient:
     def __init__(self, use_playwright: Optional[bool] = None):
         self.use_playwright = use_playwright if use_playwright is not None else True
 
-    def fetch_reviews_page(self, asin: str, marketplace: str = "amazon.it") -> Tuple[Optional[str], int, Optional[str]]:
+    def _fetch_url_resilient(self, url: str, marketplace: str = "amazon.it", max_http_retries: int = 2) -> Tuple[Optional[str], int, Optional[str]]:
         """
-        Fetches the product page for an ASIN.
+        Fetches any Amazon URL with multi-layered fallback:
+        1. Fast HTTP GET with rotated User-Agents, cookies, and retry backoff.
+        2. Stealth Playwright Browser with anti-detection evasions if HTTP is blocked.
         """
-        prod_url = get_product_url(asin, marketplace)
-        headers = get_headers(marketplace)
-        
-        logger.info(f"Fetching page for ASIN {asin} on {marketplace}...")
-        
-        # 1. HTTP Request fast attempt
-        try:
-            from bs4 import BeautifulSoup
-            session = requests.Session()
-            response = session.get(prod_url, headers=headers, timeout=12)
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, "html.parser")
-                if not is_blocked_or_unavailable(response.text, soup):
-                    return response.text, 200, None
-            elif response.status_code == 404:
-                return None, 404, "Page not found (HTTP 404)"
-        except Exception as http_e:
-            logger.info(f"Fast HTTP fetch failed for {marketplace}: {http_e}")
+        # 1. Fast HTTP attempts with retries
+        for attempt in range(1, max_http_retries + 1):
+            headers = get_headers(marketplace)
+            try:
+                session = requests.Session()
+                session.headers.update(headers)
+                resp = session.get(url, timeout=12)
+                if resp.status_code == 200:
+                    soup = BeautifulSoup(resp.text, "html.parser")
+                    if not is_blocked_or_unavailable(resp.text, soup):
+                        return resp.text, 200, None
+                    logger.warning(f"HTTP attempt {attempt} for {url} encountered CAPTCHA or blocking.")
+                elif resp.status_code == 404:
+                    return None, 404, "Page not found (HTTP 404)"
+                elif resp.status_code == 503:
+                    logger.warning(f"HTTP 503 Service Unavailable for {url} (attempt {attempt}).")
+            except Exception as http_e:
+                logger.info(f"HTTP fetch error on attempt {attempt} for {url}: {http_e}")
+            
+            if attempt < max_http_retries:
+                time.sleep(random.uniform(0.8, 1.5))
 
-        # 2. Try Playwright if enabled
+        # 2. Stealth Playwright Browser Fallback
         if self.use_playwright:
-            content, code, err = self._fetch_playwright(prod_url)
+            logger.info(f"Falling back to Playwright Stealth for {url}...")
+            content, code, err = self._fetch_playwright(url)
             if content and code == 200:
                 return content, 200, None
 
-        return None, 500, "Impossibile recuperare la pagina Amazon"
+        return None, 500, "Impossibile recuperare la pagina Amazon dopo tentativi multipli"
+
+    def fetch_reviews_page(self, asin: str, marketplace: str = "amazon.it") -> Tuple[Optional[str], int, Optional[str]]:
+        """
+        Fetches the primary page for an ASIN (tries reviews page, then product page).
+        """
+        rev_url = get_reviews_url(asin, marketplace, sort_by_recent=True)
+        content, code, err = self._fetch_url_resilient(rev_url, marketplace)
+        if content and code == 200:
+            return content, 200, None
+            
+        prod_url = get_product_url(asin, marketplace)
+        return self._fetch_url_resilient(prod_url, marketplace)
+
+    def fetch_all_reviews_for_book(self, asin: str, marketplace: str = "amazon.it", max_pages: int = 5) -> Dict[str, Any]:
+        """
+        Fetches ALL reviews for a book using a bulletproof multi-layer strategy:
+        1. Fetches the main product page (/dp/<asin>) for 100% reliable metadata and initial reviews.
+        2. If more reviews exist, paginates through /product-reviews/<asin> to collect all reviews.
+        3. Never fails silently; resilient against temporary blocks or redirects.
+        """
+        clean_asin = asin.strip().upper()
+        norm_m = normalize_marketplace(marketplace)
+        base = MARKETPLACES.get(norm_m, {}).get("base_url", "https://www.amazon.it")
+        
+        all_reviews_dict: Dict[str, Dict[str, Any]] = {}
+        combined_result: Dict[str, Any] = {
+            "status": STATUS_OK,
+            "error": None,
+            "product_title": None,
+            "cover_image_url": None,
+            "price": None,
+            "has_kindle": False,
+            "kindle_price": None,
+            "kindle_asin": None,
+            "reviews": [],
+            "total_reviews": 0,
+            "average_rating": None
+        }
+
+        # Step 1: Main product page (/dp/<asin>)
+        prod_url = f"{base}/dp/{clean_asin}"
+        html_prod, code_prod, err_prod = self._fetch_url_resilient(prod_url, norm_m)
+        
+        # Fallback to /gp/product/ or /product-reviews/ if /dp/ returned 500/unavailable
+        if not html_prod or code_prod != 200:
+            logger.info(f"/dp/ page not available for {clean_asin} on {norm_m}. Trying alternative reviews page...")
+            alt_url = f"{base}/product-reviews/{clean_asin}?reviewerType=all_reviews&sortBy=recent&pageNumber=1"
+            html_prod, code_prod, err_prod = self._fetch_url_resilient(alt_url, norm_m)
+
+        if not html_prod or code_prod != 200:
+            error_msg = err_prod or f"HTTP status {code_prod}"
+            combined_result["status"] = STATUS_PAGE_UNAVAILABLE
+            combined_result["error"] = error_msg
+            return combined_result
+
+        # Parse main page
+        parsed_prod = parse_amazon_reviews(html_prod, clean_asin, norm_m)
+        combined_result["product_title"] = parsed_prod.get("product_title")
+        combined_result["cover_image_url"] = parsed_prod.get("cover_image_url")
+        combined_result["price"] = parsed_prod.get("price")
+        combined_result["has_kindle"] = parsed_prod.get("has_kindle", False)
+        combined_result["kindle_price"] = parsed_prod.get("kindle_price")
+        combined_result["kindle_asin"] = parsed_prod.get("kindle_asin")
+        combined_result["average_rating"] = parsed_prod.get("average_rating")
+        combined_result["total_reviews"] = parsed_prod.get("total_reviews", 0)
+
+        for r in parsed_prod.get("reviews", []):
+            if r.get("review_id"):
+                all_reviews_dict[r["review_id"]] = r
+
+        # Step 2: Paginate through /product-reviews/ if more reviews exist
+        total_reported = parsed_prod.get("total_reviews", 0)
+        current_count = len(all_reviews_dict)
+        
+        if (total_reported > current_count or current_count >= 8) and max_pages > 1:
+            for page_num in range(1, max_pages + 1):
+                page_url = f"{base}/product-reviews/{clean_asin}?reviewerType=all_reviews&sortBy=recent&pageNumber={page_num}"
+                html_page, code_page, _ = self._fetch_url_resilient(page_url, norm_m, max_http_retries=1)
+                if not html_page or code_page != 200:
+                    break
+                
+                parsed_page = parse_amazon_reviews(html_page, clean_asin, norm_m)
+                page_revs = parsed_page.get("reviews", [])
+                if not page_revs:
+                    break
+                
+                new_found = 0
+                for r in page_revs:
+                    r_id = r.get("review_id")
+                    if r_id and r_id not in all_reviews_dict:
+                        all_reviews_dict[r_id] = r
+                        new_found += 1
+                        
+                # Update total reviews count and rating if more accurate
+                if parsed_page.get("total_reviews", 0) > combined_result["total_reviews"]:
+                    combined_result["total_reviews"] = parsed_page["total_reviews"]
+                if parsed_page.get("average_rating") and not combined_result["average_rating"]:
+                    combined_result["average_rating"] = parsed_page["average_rating"]
+                
+                # Stop if no new reviews on this page or we collected all
+                if new_found == 0 or len(all_reviews_dict) >= combined_result["total_reviews"]:
+                    break
+                    
+                time.sleep(random.uniform(0.5, 1.0))
+
+        combined_result["reviews"] = list(all_reviews_dict.values())
+        combined_result["total_reviews"] = max(len(all_reviews_dict), combined_result["total_reviews"])
+        
+        if len(all_reviews_dict) > 0:
+            combined_result["status"] = STATUS_OK
+        elif combined_result["product_title"] or parsed_prod.get("status") == STATUS_NO_REVIEWS:
+            combined_result["status"] = STATUS_NO_REVIEWS
+        else:
+            combined_result["status"] = parsed_prod.get("status", STATUS_OK)
+        
+        return combined_result
 
     def _fetch_playwright(self, url: str) -> Tuple[Optional[str], int, Optional[str]]:
-        """Playwright execution in a dedicated thread to safely isolate from any asyncio event loops."""
+        """Playwright execution in a dedicated thread with stealth anti-bot evasion."""
         def _exec_sync():
             try:
                 from playwright.sync_api import sync_playwright
                 logger.info(f"Fetching {url} via Playwright Stealth in worker thread...")
                 with sync_playwright() as p:
+                    launch_args = [
+                        "--disable-blink-features=AutomationControlled",
+                        "--no-sandbox",
+                        "--disable-setuid-sandbox",
+                        "--disable-infobars",
+                        "--window-size=1920,1080",
+                    ]
                     try:
-                        browser = p.chromium.launch(
-                            headless=True,
-                            channel="chrome",
-                            args=[
-                                "--disable-blink-features=AutomationControlled",
-                                "--no-sandbox",
-                                "--disable-setuid-sandbox"
-                            ]
-                        )
+                        browser = p.chromium.launch(headless=True, channel="chrome", args=launch_args)
                     except Exception:
-                        browser = p.chromium.launch(
-                            headless=True,
-                            args=[
-                                "--disable-blink-features=AutomationControlled",
-                                "--no-sandbox",
-                                "--disable-setuid-sandbox"
-                            ]
-                        )
+                        browser = p.chromium.launch(headless=True, args=launch_args)
+                    
                     context = browser.new_context(
                         user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
                         locale="it-IT",
                         timezone_id="Europe/Rome",
-                        viewport={"width": 1280, "height": 800}
+                        viewport={"width": 1920, "height": 1080},
+                        extra_http_headers={
+                            "Accept-Language": "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7",
+                            "DNT": "1"
+                        }
                     )
+                    
+                    # Inject stealth scripts before page scripts load
+                    context.add_init_script("""
+                        Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                        Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+                        window.chrome = { runtime: {} };
+                    """)
+                    
                     page = context.new_page()
                     alt_url = url.replace("/gp/product/", "/dp/") if "/gp/product/" in url else url.replace("/dp/", "/gp/product/")
                     content = None
+                    
                     for target_url in [url, alt_url]:
                         try:
                             page.goto(target_url, wait_until="domcontentloaded", timeout=25000)
-                            time.sleep(1.0)
+                            time.sleep(1.2)
+                            
+                            # Trigger lazy loading by scrolling down
+                            try:
+                                page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
+                                time.sleep(0.5)
+                                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                                time.sleep(0.5)
+                            except Exception:
+                                pass
+                                
                             page_title = page.title()
                             if "Amazon" in page_title and len(page_title) < 15:
                                 time.sleep(1.5)
                                 page.reload(wait_until="domcontentloaded")
+                                
                             html_text = page.content()
-                            if html_text and len(html_text) > 15000:
+                            if html_text and len(html_text) > 10000:
                                 content = html_text
                                 break
                         except Exception as e:
                             time.sleep(1.0)
+                            
                     browser.close()
                     if content:
                         return content, 200, None
