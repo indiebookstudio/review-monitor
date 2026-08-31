@@ -12,12 +12,13 @@ class Settings(BaseSettings):
     
     DATABASE_URL: str = Field(default="sqlite:///./data/kdp_monitor.db")
     
-    # SMTP
+    # Email & Notifications
+    RESEND_API_KEY: str = Field(default="")
     SMTP_HOST: str = Field(default="smtp.gmail.com")
     SMTP_PORT: int = Field(default=587)
     SMTP_USER: str = Field(default="")
     SMTP_PASSWORD: str = Field(default="")
-    ALERT_EMAIL: str = Field(default="")
+    ALERT_EMAIL: str = Field(default="saluccimarco@gmail.com")
     NOTIFICATIONS_ENABLED: bool = Field(default=True)
     
     DASHBOARD_URL: str = Field(default="http://localhost:8000")
