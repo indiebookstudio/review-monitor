@@ -6,12 +6,33 @@ from app.amazon.client import AmazonClient
 
 class MockAmazonClient(AmazonClient):
     def __init__(self, html_content: str, status_code: int = 200, error: str = None):
+        super().__init__(use_playwright=False)
         self.html_content = html_content
         self.status_code = status_code
         self.error = error
 
     def fetch_reviews_page(self, asin: str, marketplace: str = "amazon.com"):
         return self.html_content, self.status_code, self.error
+
+    def fetch_all_reviews_for_book(self, asin: str, marketplace: str = "amazon.com", max_pages: int = 5):
+        from app.amazon.parser import parse_amazon_reviews, STATUS_PAGE_UNAVAILABLE, is_blocked_or_unavailable
+        from bs4 import BeautifulSoup
+        if self.status_code != 200 or not self.html_content:
+            return {
+                "status": STATUS_PAGE_UNAVAILABLE,
+                "error": self.error or f"HTTP {self.status_code}",
+                "reviews": [],
+                "total_reviews": 0
+            }
+        soup = BeautifulSoup(self.html_content, "html.parser")
+        if is_blocked_or_unavailable(self.html_content, soup):
+            return {
+                "status": STATUS_PAGE_UNAVAILABLE,
+                "error": "Captcha / Robot check",
+                "reviews": [],
+                "total_reviews": 0
+            }
+        return parse_amazon_reviews(self.html_content, asin, marketplace)
 
 def test_monitor_bootstrap_no_alert(db_session, sample_html_reviews):
     # Add a book

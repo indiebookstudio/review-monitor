@@ -33,6 +33,36 @@ def extract_rating(text: str) -> Optional[float]:
             pass
     return None
 
+ORIGIN_COUNTRY_RULES = [
+    (r'(?:in|aus|en|w|i|den|au|de|negli|nei)\s+(?:italia|italy|italien|italie|włoszech)', "Italia", "🇮🇹"),
+    (r'(?:in|aus|en|w|i|den|au|de|negli|nei|the|los|las|aux|in den)\s+(?:stati uniti|united states|us|usa|états-unis|estados unidos|vereenigde staten|stanach zjednoczonych)', "Stati Uniti", "🇺🇸"),
+    (r'(?:in|aus|en|w|i|den|au|de|nel|le|el|the|au)\s+(?:regno unito|united kingdom|uk|royaume-uni|reino unido|großbritannien|wielkiej brytanii)', "Regno Unito", "🇬🇧"),
+    (r'(?:in|aus|en|w|i|den|au|de)\s+(?:germania|germany|deutschland|allemagne|alemania|duitsland|niemczech)', "Germania", "🇩🇪"),
+    (r'(?:in|aus|en|w|i|den|au|de)\s+(?:francia|france|frankreich|francie|francji|frankrijk)', "Francia", "🇫🇷"),
+    (r'(?:in|aus|en|w|i|den|au|de)\s+(?:spagna|spain|spanien|espagne|españa|spanje|hiszpanii)', "Spagna", "🇪🇸"),
+    (r'(?:in|aus|en|w|i|den|au|de|nei|in den|aux)\s+(?:paesi bassi|netherlands|niederlande|pays-bas|países bajos|nederland|holandii)', "Paesi Bassi", "🇳🇱"),
+    (r'(?:in|aus|en|w|i|den|au|de)\s+(?:polonia|poland|polen|pologne|polsce)', "Polonia", "🇵🇱"),
+    (r'(?:in|aus|en|w|i|den|au|de)\s+(?:svezia|sweden|schweden|suède|suecia|zweden|szwecji|sverige)', "Svezia", "🇸🇪"),
+    (r'(?:in|aus|en|w|i|den|au|de|en|au)\s+(?:belgio|belgium|belgien|belgique|bélgica|belgië|belgii)', "Belgio", "🇧🇪"),
+    (r'(?:in|aus|en|w|i|den|au|de)\s+(?:irlanda|ireland|irland|irlande|irlanda|ierland|irlandii)', "Irlanda", "🇮🇪"),
+    (r'(?:in|aus|en|w|i|den|au|de|日本で)\s+(?:giappone|japan|japon|japón|日本)', "Giappone", "🇯🇵"),
+    (r'(?:in|aus|en|w|i|den|au|de|au)\s+(?:canada|kanada)', "Canada", "🇨🇦"),
+    (r'(?:in|aus|en|w|i|den|au|de|en)\s+(?:australia|australien|australie)', "Australia", "🇦🇺"),
+]
+
+def extract_origin_country(date_text: Optional[str], default_marketplace: str = "amazon.it") -> tuple:
+    if date_text:
+        d_lower = date_text.lower()
+        for pat, cname, flag in ORIGIN_COUNTRY_RULES:
+            if re.search(pat, d_lower, re.IGNORECASE):
+                return cname, flag
+                
+    # Fallback to marketplace country
+    from app.amazon.marketplace import MARKETPLACES, normalize_marketplace
+    norm_m = normalize_marketplace(default_marketplace)
+    meta = MARKETPLACES.get(norm_m, {})
+    return meta.get("name", "Italia"), meta.get("flag", "🇮🇹")
+
 def is_blocked_or_unavailable(html: str, soup: BeautifulSoup) -> bool:
     if not html or len(html.strip()) == 0:
         return True
@@ -484,6 +514,7 @@ def parse_amazon_reviews(html: str, asin: str, marketplace: str = "amazon.it") -
                 review_video = src_attr
 
         if review_id:
+            c_name, c_flag = extract_origin_country(review_date, marketplace)
             reviews.append({
                 "review_id": review_id,
                 "rating": rating,
@@ -493,7 +524,9 @@ def parse_amazon_reviews(html: str, asin: str, marketplace: str = "amazon.it") -
                 "review_date": review_date,
                 "review_url": review_url,
                 "images": review_images,
-                "video_url": review_video
+                "video_url": review_video,
+                "origin_country": c_name,
+                "origin_flag": c_flag
             })
 
     # Page aggregate stats

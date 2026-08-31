@@ -18,6 +18,7 @@ from app.database import SessionLocal
 from app.models import Book, Review
 from app.reviews.statistics import get_dashboard_kpis
 from app.amazon.marketplace import MARKETPLACES
+from app.amazon.parser import extract_origin_country
 
 MONTHS_MAP = {
     # Italian
@@ -152,12 +153,15 @@ def generate_static_html(output_path: Path) -> str:
                 r_disp, r_ts = parse_clean_review_date(r.review_date)
                 if r_disp == "-" and r.first_seen_at:
                     r_disp = r.first_seen_at.strftime("%d/%m/%Y")
+                c_name, c_flag = extract_origin_country(r.review_date, b.marketplace)
                 serialized_revs.append({
                     "id": r.review_id,
                     "rating": r.rating or 5.0,
                     "stars": format_stars(r.rating or 5.0),
                     "title": r.title or "Recensione",
                     "author": r.author or "Cliente Amazon",
+                    "country_name": c_name,
+                    "flag": c_flag,
                     "date": r_disp,
                     "body": r.body or "",
                     "url": r.review_url or f"https://www.{b.marketplace}/dp/{b.asin}"
@@ -975,7 +979,7 @@ def generate_static_html(output_path: Path) -> str:
               <a href="${{r.url}}" target="_blank" style="font-size: 0.78rem; color: #0284c7; font-weight: 700; text-decoration: underline;">Vedi su Amazon ↗</a>
             </div>
             <div class="review-title">${{r.title}}</div>
-            <div class="review-meta">Scritta da <strong>${{r.author}}</strong> &bull; Data: <strong>${{r.date}}</strong></div>
+            <div class="review-meta">Scritta da <strong>${{r.author}}</strong> ${{r.flag ? r.flag + ' <span style=\"color: #64748b; font-size: 0.76rem;\">(' + r.country_name + ')</span>' : ''}} &bull; Data: <strong>${{r.date}}</strong></div>
             <div class="review-text">${{r.body}}</div>
           </div>
         `).join('');

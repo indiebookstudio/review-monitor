@@ -21,7 +21,7 @@ def get_dashboard_kpis(db: Session) -> Dict[str, Any]:
     d30 = now - datetime.timedelta(days=30)
     d60 = now - datetime.timedelta(days=60)
     
-    total_books = db.query(Book).filter(Book.enabled == True).count()
+    total_books = db.query(func.count(func.distinct(Book.asin))).filter(Book.enabled == True).scalar() or 0
     total_reviews = db.query(Review).count()
     
     # Average rating across all reviews

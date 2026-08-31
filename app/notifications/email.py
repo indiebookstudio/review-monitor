@@ -8,6 +8,7 @@ import requests
 
 from app.config import settings
 from app.models import AppSetting
+from app.amazon.parser import extract_origin_country
 
 logger = logging.getLogger(__name__)
 
@@ -175,8 +176,9 @@ def build_review_email_content(
         author = rev.get("author") or "Cliente Amazon"
         date_str = rev.get("review_date") or ""
         body = rev.get("body") or ""
+        c_name, c_flag = extract_origin_country(date_str, marketplace)
 
-        subject = f"[My KDP Reviews] Nuova recensione ({rating_val}★) - {book_title}"
+        subject = f"[My KDP Reviews] {c_flag} Nuova recensione ({rating_val}★) - {book_title}"
 
         body_text = f"""Nuova recensione su {marketplace}
 
@@ -185,7 +187,7 @@ ASIN: {asin}
 
 Valutazione: {rating_val}/5 {stars}
 Titolo: {rev_title}
-Autore: {author}{f' ({date_str})' if date_str else ''}
+Autore: {author} {c_flag} ({c_name}){f' ({date_str})' if date_str else ''}
 
 Testo:
 {body}
@@ -215,7 +217,7 @@ Dashboard: {dashboard_url}
       <span style="color: #f59e0b;">{stars}</span> {rating_val}/5 &mdash; {rev_title}
     </div>
     <div style="font-size: 13px; color: #64748b; margin-bottom: 8px;">
-      Scritta da <strong>{author}</strong>{f' il {date_str}' if date_str else ''}
+      Scritta da <strong>{author}</strong> {c_flag} <span style="color: #64748b; font-size: 12px;">({c_name})</span>{f' il {date_str}' if date_str else ''}
     </div>
     {f'<div style="color: #334155; white-space: pre-wrap; font-size: 14px; margin-top: 8px;">{body}</div>' if body else ''}
   </div>
@@ -242,9 +244,10 @@ Dashboard: {dashboard_url}
             author = rev.get("author") or "Cliente Amazon"
             date_str = rev.get("review_date") or ""
             body = rev.get("body") or ""
+            c_name, c_flag = extract_origin_country(date_str, marketplace)
 
             text_reviews.append(f"""- {rating_val}/5 {stars}: {rev_title}
-  Autore: {author}{f' ({date_str})' if date_str else ''}
+  Autore: {author} {c_flag} ({c_name}){f' ({date_str})' if date_str else ''}
   {body}
   Link: {rev_link}
 """)
@@ -254,7 +257,7 @@ Dashboard: {dashboard_url}
       <span style="color: #f59e0b;">{stars}</span> {rating_val}/5 &mdash; {rev_title}
     </div>
     <div style="font-size: 13px; color: #64748b; margin-bottom: 8px;">
-      Scritta da <strong>{author}</strong>{f' il {date_str}' if date_str else ''}
+      Scritta da <strong>{author}</strong> {c_flag} <span style="color: #64748b; font-size: 12px;">({c_name})</span>{f' il {date_str}' if date_str else ''}
     </div>
     {f'<div style="color: #334155; white-space: pre-wrap; font-size: 14px; margin-top: 8px;">{body}</div>' if body else ''}
     <div style="margin-top: 8px; font-size: 13px;">
@@ -345,9 +348,10 @@ def build_digest_email_content(
             author = rev.get("author") or "Cliente Amazon"
             date_str = rev.get("review_date") or ""
             body = rev.get("body") or ""
+            c_name, c_flag = extract_origin_country(date_str, mkt)
             
             text_rev_lines.append(f"""  - {rating_val}/5 {stars}: {rev_title}
-    Autore: {author}{f' ({date_str})' if date_str else ''}
+    Autore: {author} {c_flag} ({c_name}){f' ({date_str})' if date_str else ''}
     {body}
     Link recensione: {rev_link}""")
             
@@ -357,7 +361,7 @@ def build_digest_email_content(
         <span style="color: #f59e0b;">{stars}</span> {rating_val}/5 &mdash; {rev_title}
       </div>
       <div style="font-size: 13px; color: #64748b; margin-bottom: 6px;">
-        Recensito da <strong>{author}</strong>{f' &bull; {date_str}' if date_str else ''}
+        Recensito da <strong>{author}</strong> {c_flag} <span style="color: #64748b; font-size: 12px;">({c_name})</span>{f' &bull; {date_str}' if date_str else ''}
       </div>
       {f'<div style="color: #334155; font-size: 14px; line-height: 1.5; white-space: pre-wrap; margin-bottom: 8px;">{body}</div>' if body else ''}
       <div style="font-size: 13px;">
@@ -647,8 +651,8 @@ def send_daily_digest_report(
     if db is not None:
         from app.models import Book, Review, AppSetting
         from sqlalchemy import func
-        distinct_asins = db.query(func.count(func.distinct(Book.asin))).scalar() or 0
-        total_books_catalog = distinct_asins if distinct_asins > 0 else books_checked
+        distinct_asins = db.query(func.count(func.distinct(Book.asin))).filter(Book.enabled == True).scalar() or 0
+        total_books_catalog = distinct_asins if distinct_asins > 0 else (books_checked // 14 if books_checked > 14 else books_checked)
         total_reviews_catalog = db.query(Review).count()
         avg_res = db.query(func.avg(Review.rating)).scalar()
         avg_rating_catalog = round(float(avg_res), 2) if avg_res is not None else 5.0

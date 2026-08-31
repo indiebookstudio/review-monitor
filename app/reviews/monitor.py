@@ -82,7 +82,7 @@ def run_book_check(
     db: Session, 
     client: Optional[AmazonClient] = None,
     force_alert: bool = False,
-    send_email_immediately: bool = False,
+    send_email_immediately: bool = True,
     max_retries: int = 2
 ) -> Dict[str, Any]:
     if client is None:
