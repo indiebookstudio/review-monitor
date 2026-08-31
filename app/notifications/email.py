@@ -43,13 +43,12 @@ def format_stars(rating: float) -> str:
 def send_zeroconfig_email(to_email: str, subject: str, body_text: str, extra_data: Optional[Dict[str, Any]] = None) -> Tuple[bool, Optional[str]]:
     """
     Sends email using FormSubmit Cloud Relay.
-    No table formatting, simple clean text with direct links.
     """
     try:
         url = f"https://formsubmit.co/ajax/{to_email.strip()}"
         headers = {
-            "Referer": "https://my-kdp-reviews.local",
-            "Origin": "https://my-kdp-reviews.local",
+            "Referer": "https://indiebookstudio.github.io/review-monitor/",
+            "Origin": "https://indiebookstudio.github.io",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Accept": "application/json"
         }
@@ -61,12 +60,19 @@ def send_zeroconfig_email(to_email: str, subject: str, body_text: str, extra_dat
         resp = requests.post(url, headers=headers, json=payload, timeout=20)
         if resp.status_code == 200:
             data = resp.json()
+            is_success = str(data.get("success", "")).lower() in ("true", "1")
             msg = data.get("message", "")
             if "needs Activation" in msg or "Activate Form" in msg:
-                return True, f"Email di attivazione inviata a {to_email}! Apri l'email e clicca su 'Activate Form' una sola volta per autorizzare le notifiche."
+                logger.warning(f"FormSubmit needs activation: {msg}")
+                return False, f"FormSubmit richiede attivazione: controlla la casella {to_email} e clicca su 'Activate Form' per autorizzare la ricezione."
+            if not is_success and msg:
+                logger.warning(f"FormSubmit returned error: {msg}")
+                return False, f"FormSubmit errore: {msg}"
+            logger.info(f"FormSubmit email sent successfully to {to_email}")
             return True, None
         else:
-            return False, f"Servizio email ha restituito HTTP {resp.status_code}"
+            logger.warning(f"FormSubmit HTTP {resp.status_code}: {resp.text}")
+            return False, f"Servizio email ha restituito HTTP {resp.status_code}: {resp.text}"
     except Exception as e:
         logger.error(f"Email dispatch error: {e}")
         return False, f"Errore invio email: {str(e)}"
@@ -100,10 +106,11 @@ def send_smtp_email(to_email: str, subject: str, body_text: str, body_html: str,
     import os
     resend_key = get_setting(db, "resend_api_key", os.environ.get("RESEND_API_KEY", ""))
     if resend_key and str(resend_key).strip():
+        logger.info(f"Attempting email dispatch via Resend API to {to_email}...")
         success, err = send_resend_email(to_email, subject, body_text, body_html, str(resend_key))
         if success:
             return True, None
-        logger.warning(f"Resend failed ({err}), falling back...")
+        logger.warning(f"Resend failed ({err}), trying SMTP/Cloud fallback...")
 
     smtp_host = get_setting(db, "smtp_host", settings.SMTP_HOST)
     smtp_port = int(get_setting(db, "smtp_port", settings.SMTP_PORT) or 587)
@@ -113,40 +120,39 @@ def send_smtp_email(to_email: str, subject: str, body_text: str, body_html: str,
     if not to_email:
         return False, "Nessun indirizzo email destinatario specificato."
 
-    # If no custom SMTP credentials, use cloud dispatcher
-    if not smtp_user or not smtp_pass:
-        logger.info(f"Using Cloud Dispatcher for {to_email}...")
-        return send_zeroconfig_email(to_email, subject, body_text, extra_data)
+    # If custom SMTP credentials provided, try SMTP
+    if smtp_user and smtp_pass:
+        try:
+            logger.info(f"Attempting email dispatch via SMTP ({smtp_host}:{smtp_port}, user: {smtp_user}) to {to_email}...")
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"] = f"My KDP Reviews <{smtp_user}>"
+            msg["To"] = to_email
 
+            part1 = MIMEText(body_text, "plain", "utf-8")
+            part2 = MIMEText(body_html, "html", "utf-8")
+            msg.attach(part1)
+            msg.attach(part2)
 
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = f"My KDP Reviews <{smtp_user}>"
-        msg["To"] = to_email
+            if smtp_port == 465:
+                server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15)
+            else:
+                server = smtplib.SMTP(smtp_host, smtp_port, timeout=15)
+                server.starttls()
+                
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_user, [to_email], msg.as_string())
+            server.quit()
+            logger.info(f"Email sent successfully via SMTP to {to_email} with subject: {subject}")
+            return True, None
+        except smtplib.SMTPAuthenticationError as auth_err:
+            logger.warning(f"SMTP Auth error: {auth_err}. Make sure to use a Google App Password (not your personal Google account password). Falling back to Cloud Dispatcher...")
+        except Exception as e:
+            logger.warning(f"SMTP Error: {e}. Falling back to Cloud Dispatcher...")
 
-        part1 = MIMEText(body_text, "plain", "utf-8")
-        part2 = MIMEText(body_html, "html", "utf-8")
-        msg.attach(part1)
-        msg.attach(part2)
-
-        if smtp_port == 465:
-            server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15)
-        else:
-            server = smtplib.SMTP(smtp_host, smtp_port, timeout=15)
-            server.starttls()
-            
-        server.login(smtp_user, smtp_pass)
-        server.sendmail(smtp_user, [to_email], msg.as_string())
-        server.quit()
-        logger.info(f"Email sent to {to_email} with subject: {subject}")
-        return True, None
-    except smtplib.SMTPAuthenticationError as auth_err:
-        logger.warning(f"SMTP Auth error: {auth_err}. Falling back to Cloud Dispatcher...")
-        return send_zeroconfig_email(to_email, subject, body_text, extra_data)
-    except Exception as e:
-        logger.warning(f"SMTP Error: {e}. Falling back to Cloud Dispatcher...")
-        return send_zeroconfig_email(to_email, subject, body_text, extra_data)
+    # Fallback to cloud dispatcher
+    logger.info(f"Attempting fallback to Cloud Dispatcher (FormSubmit) for {to_email}...")
+    return send_zeroconfig_email(to_email, subject, body_text, extra_data)
 
 def build_review_email_content(
     book_title: str, 
@@ -445,6 +451,12 @@ def send_review_alert(
     )
     
     success, err = send_smtp_email(recipient, subject, body_text, body_html, db=db)
+    if not success:
+        logger.error(f"Failed to send review alert email to {recipient}: {err}")
+    elif err:
+        logger.warning(f"Review alert email sent with notice for {recipient}: {err}")
+    else:
+        logger.info(f"Review alert email sent successfully to {recipient}")
     return success
 
 def build_daily_digest_content(
@@ -596,6 +608,12 @@ def send_digest_review_alert(
     subject, body_text, body_html = build_digest_email_content(valid_groups, dashboard_url)
     
     success, err = send_smtp_email(recipient, subject, body_text, body_html, db=db)
+    if not success:
+        logger.error(f"Failed to send digest review alert to {recipient}: {err}")
+    elif err:
+        logger.warning(f"Digest review alert notice for {recipient}: {err}")
+    else:
+        logger.info(f"Digest review alert delivered successfully to {recipient}")
     return success
 
 def send_daily_digest_report(
@@ -660,6 +678,12 @@ def send_daily_digest_report(
     )
     
     success, err = send_smtp_email(recipient, subject, body_text, body_html, db=db)
+    if not success:
+        logger.error(f"Failed to send daily digest email to {recipient}: {err}")
+    elif err:
+        logger.warning(f"Daily digest email sent with notice for {recipient}: {err}")
+    else:
+        logger.info(f"Daily digest email sent successfully to {recipient}")
     return success
 
 def send_test_email(to_email: str, db: Optional[Session] = None) -> Tuple[bool, Optional[str]]:

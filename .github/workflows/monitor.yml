@@ -4,7 +4,13 @@ on:
   schedule:
     # Esegue ogni notte alle 03:25 UTC (04:25/05:25 ora italiana) per avere le notifiche pronte al mattino
     - cron: '25 3 * * *'
-  workflow_dispatch: # Avvio manuale su richiesta da interfaccia GitHub o app mobile
+  workflow_dispatch:
+    inputs:
+      test_email_only:
+        description: 'Esegui solo il test di invio email (senza scraping recensioni)'
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: kdp-monitor
@@ -34,7 +40,21 @@ jobs:
           pip install -r requirements.txt
           playwright install chromium --with-deps
 
+      - name: Run Test Email Only
+        if: ${{ github.event.inputs.test_email_only == 'true' }}
+        env:
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL || 'saluccimarco@gmail.com' }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST || '' }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '587' }}
+          SMTP_USER: ${{ secrets.SMTP_USER || '' }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD || '' }}
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL || 'https://indiebookstudio.github.io/review-monitor/' }}
+        run: |
+          python scripts/test_email.py
+
       - name: Run Review Monitor Check
+        if: ${{ github.event.inputs.test_email_only != 'true' }}
         env:
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL || 'saluccimarco@gmail.com' }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
@@ -50,6 +70,7 @@ jobs:
           python scripts/generate_static_dashboard.py
 
       - name: Commit and Push Database and GitHub Pages
+        if: ${{ github.event.inputs.test_email_only != 'true' }}
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
