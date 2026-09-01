@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     
     DASHBOARD_URL: str = Field(default="http://localhost:8000")
     CHECK_FREQUENCY_HOURS: int = Field(default=24)
+    AUTOMATIC_CHECKS_ENABLED: bool = Field(default=False)
     USE_PLAYWRIGHT_FALLBACK: bool = Field(default=False)
     
     model_config = SettingsConfigDict(

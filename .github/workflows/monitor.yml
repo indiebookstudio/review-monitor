@@ -1,9 +1,10 @@
 name: KDP Review Monitor
 
+# on:
+#   schedule:
+#     # Esegue ogni notte alle 03:25 UTC (04:25/05:25 ora italiana) per avere le notifiche pronte al mattino
+#     - cron: '25 3 * * *'
 on:
-  schedule:
-    # Esegue ogni notte alle 03:25 UTC (04:25/05:25 ora italiana) per avere le notifiche pronte al mattino
-    - cron: '25 3 * * *'
   workflow_dispatch:
     inputs:
       test_email_only:

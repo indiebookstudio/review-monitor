@@ -39,6 +39,15 @@ def parse_frequency_hours(freq_str: str) -> int:
     return FREQUENCY_HOURS_MAP.get(key, 24)
 
 def is_check_due(db: Session) -> bool:
+    from app.config import settings as app_settings
+    # Check if automatic checks are globally enabled or disabled
+    setting_auto = db.query(AppSetting).filter(AppSetting.key == "automatic_checks_enabled").first()
+    if setting_auto is not None:
+        if str(setting_auto.value).strip().lower() in ("false", "0", "no", "disabled"):
+            return False
+    elif not getattr(app_settings, "AUTOMATIC_CHECKS_ENABLED", False):
+        return False
+
     setting_freq = db.query(AppSetting).filter(AppSetting.key == "check_frequency").first()
     freq_hours = parse_frequency_hours(setting_freq.value if setting_freq else "24h")
     

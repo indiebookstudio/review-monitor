@@ -92,34 +92,39 @@ async def lifespan(app: FastAPI):
         logger.info("Database & 14 Marketplaces auto-expansion completed.")
     except Exception as exp_err:
         logger.warning(f"Marketplace expansion warning: {exp_err}")
-    # Start APScheduler for automatic recurring check runs and daily digest emails
-    from apscheduler.schedulers.background import BackgroundScheduler
-    scheduler = BackgroundScheduler()
-    
-    def scheduled_monitor_job():
-        job_db = SessionLocal()
-        try:
-            from app.reviews.monitor import run_all_checks, is_check_due
-            if is_check_due(job_db):
-                logger.info("[Scheduler] Scheduled check is due. Running monitor check and daily digest...")
-                run_all_checks(job_db, force=False)
-        except Exception as e:
-            logger.error(f"[Scheduler] Error during scheduled check: {e}")
-        finally:
-            job_db.close()
-            
-    # Check every 15 minutes if a scheduled run is due based on configured frequency
-    scheduler.add_job(scheduled_monitor_job, "interval", minutes=15, id="kdp_scheduled_monitor", replace_existing=True)
-    scheduler.start()
-    logger.info("Background recurring monitor scheduler started (polling every 15m).")
+    # APScheduler for automatic recurring check runs
+    scheduler = None
+    if getattr(settings, "AUTOMATIC_CHECKS_ENABLED", False):
+        from apscheduler.schedulers.background import BackgroundScheduler
+        scheduler = BackgroundScheduler()
+        
+        def scheduled_monitor_job():
+            job_db = SessionLocal()
+            try:
+                from app.reviews.monitor import run_all_checks, is_check_due
+                if is_check_due(job_db):
+                    logger.info("[Scheduler] Scheduled check is due. Running monitor check and daily digest...")
+                    run_all_checks(job_db, force=False)
+            except Exception as e:
+                logger.error(f"[Scheduler] Error during scheduled check: {e}")
+            finally:
+                job_db.close()
+                
+        # Check every 15 minutes if a scheduled run is due based on configured frequency
+        scheduler.add_job(scheduled_monitor_job, "interval", minutes=15, id="kdp_scheduled_monitor", replace_existing=True)
+        scheduler.start()
+        logger.info("Background recurring monitor scheduler started (polling every 15m).")
+    else:
+        logger.info("Automatic review checks are DISABLED per configuration.")
         
     yield
     # Shutdown
     logger.info("Shutting down KDP Performance Dashboard...")
-    try:
-        scheduler.shutdown(wait=False)
-    except Exception:
-        pass
+    if scheduler:
+        try:
+            scheduler.shutdown(wait=False)
+        except Exception:
+            pass
 
 app = FastAPI(
     title="KDP Performance Dashboard",
