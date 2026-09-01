@@ -1,0 +1,55 @@
+name: Add Book by ASIN
+
+on:
+  workflow_dispatch:
+    inputs:
+      asin:
+        description: 'Amazon ASIN code or Product URL (e.g. B0H717X9ZL)'
+        required: true
+        type: string
+
+concurrency:
+  group: kdp-monitor
+  cancel-in-progress: false
+
+jobs:
+  add-book:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Add Book and Scrape
+        env:
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL || 'saluccimarco@gmail.com' }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL || 'https://indiebookstudio.github.io/review-monitor/' }}
+        run: |
+          python scripts/add_book.py "${{ github.event.inputs.asin }}"
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/kdp_monitor.db docs/index.html
+          if ! git diff --staged --quiet; then
+            git commit -m "feat: added book ${{ github.event.inputs.asin }} via GitHub Actions [skip ci]"
+            git pull --rebase origin master
+            git push origin master
+          fi
