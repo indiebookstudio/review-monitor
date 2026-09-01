@@ -87,14 +87,12 @@
       font-weight: 700;
     }
 
-    .btn-add-book-nav {
-      background: #0284c7;
-      color: #ffffff;
+    .btn-nav {
       border: none;
-      padding: 8px 16px;
+      padding: 8px 14px;
       border-radius: 8px;
       font-weight: 700;
-      font-size: 0.85rem;
+      font-size: 0.84rem;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
@@ -102,9 +100,24 @@
       box-shadow: 0 1px 2px rgba(0,0,0,0.05);
       transition: all 0.15s;
     }
-    .btn-add-book-nav:hover {
+
+    .btn-nav-primary {
+      background: #0284c7;
+      color: #ffffff;
+    }
+    .btn-nav-primary:hover {
       background: #0369a1;
       transform: translateY(-1px);
+    }
+
+    .btn-nav-secondary {
+      background: #f1f5f9;
+      color: #1e293b;
+      border: 1px solid #cbd5e1;
+    }
+    .btn-nav-secondary:hover {
+      background: #e2e8f0;
+      border-color: #94a3b8;
     }
 
     .container {
@@ -441,7 +454,7 @@
       border-color: #0284c7;
     }
 
-    /* Modal for Reviews & Add Book */
+    /* Modal for Reviews & Tools */
     .modal-overlay {
       display: none;
       position: fixed;
@@ -535,6 +548,28 @@
       white-space: pre-wrap;
       line-height: 1.45;
     }
+
+    /* Live Terminal Box */
+    .terminal-box {
+      background: #0f172a;
+      color: #38bdf8;
+      border-radius: 10px;
+      padding: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      max-height: 220px;
+      overflow-y: auto;
+      margin-top: 10px;
+      border: 1px solid #334155;
+    }
+
+    .terminal-line {
+      margin-bottom: 4px;
+    }
+    .terminal-line.success { color: #4ade80; }
+    .terminal-line.info { color: #38bdf8; }
+    .terminal-line.warn { color: #facc15; }
   </style>
 </head>
 <body>
@@ -547,11 +582,14 @@
         <span>KDP Review Monitor</span>
         <span class="status-pill">● Live</span>
       </div>
-      <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
-        <div style="font-size: 0.8rem; color: var(--text-muted);">
-          Ultimo controllo: <strong style="color: #0f172a;">01/09/2026 alle 16:40 UTC</strong> &bull; Schedulazione: <span style="color: #0284c7; font-weight: 700;">Ogni notte alle 03:25 UTC</span>
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-right: 4px;">
+          Ultimo controllo: <strong style="color: #0f172a;">01/09/2026 alle 16:56 UTC</strong>
         </div>
-        <button class="btn-add-book-nav" onclick="openAddBookModal()">
+        <button class="btn-nav btn-nav-secondary" onclick="openForceCheckModal()">
+          <span>🔄 Forza Controllo</span>
+        </button>
+        <button class="btn-nav btn-nav-primary" onclick="openAddBookModal()">
           <span>+ Aggiungi Libro</span>
         </button>
       </div>
@@ -698,9 +736,12 @@
           </span>
         </div>
 
-        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-left: auto;">
-          <button class="btn-add-book-nav" onclick="openAddBookModal()" style="padding: 6px 14px; font-size: 0.82rem;">
-            <span>+ Aggiungi Nuovo ASIN</span>
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto;">
+          <button class="btn-nav btn-nav-secondary" onclick="openForceCheckModal()" style="padding: 6px 12px; font-size: 0.8rem;">
+            <span>🔄 Forza Controllo</span>
+          </button>
+          <button class="btn-nav btn-nav-primary" onclick="openAddBookModal()" style="padding: 6px 12px; font-size: 0.8rem;">
+            <span>+ Aggiungi ASIN</span>
           </button>
           <div class="search-box">
             <span class="search-icon">🔍</span>
@@ -743,6 +784,75 @@
       </div>
       <div class="modal-body" id="modalReviewsList">
         <!-- Rendered by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Forza Controllo Online -->
+  <div class="modal-overlay" id="forceCheckModal" onclick="closeForceCheckModal(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.2rem;">🔄</span>
+          <span>Forza Controllo Recensioni Subito</span>
+        </div>
+        <button class="modal-close" onclick="closeForceCheckModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.9rem; color: #334155; margin-bottom: 16px; line-height: 1.5;">
+          Puoi avviare la scansione immediata di tutti i <strong>308 marketplace</strong> del catalogo con rilevamento automatico delle nuove recensioni e invio della notifica email.
+        </p>
+
+        <!-- Method 1: GitHub Actions 1-Click -->
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 16px; margin-bottom: 16px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <div style="font-weight: 800; font-size: 0.95rem; color: #1e40af;">
+              Metodo 1: Avvia su GitHub Actions (Cloud 1-Click)
+            </div>
+            <span style="background: #dbeafe; color: #1d4ed8; font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 999px;">CONSIGLIATO</span>
+          </div>
+          <p style="font-size: 0.82rem; color: #1e3a8a; margin-bottom: 12px; line-height: 1.45;">
+            Clicca sotto per aprire GitHub Actions: premi <strong>"Run workflow"</strong> sul branch <code>master</code>. Il bot eseguirà tutti i controlli in ~2 minuti e invierà le notifiche email.
+          </p>
+          <a href="https://github.com/indiebookstudio/review-monitor/actions/workflows/monitor.yml" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; background: #0284c7; color: white; text-decoration: none; padding: 10px 18px; border-radius: 8px; font-weight: 700; font-size: 0.88rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: background 0.15s;">
+            <span>🚀 Apri GitHub Actions per Avviare il Controllo ↗</span>
+          </a>
+        </div>
+
+        <!-- Method 2: Live Local Server SSE -->
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 16px; margin-bottom: 16px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <div style="font-weight: 800; font-size: 0.95rem; color: #166534;">
+              Metodo 2: Interfaccia Locale con Log Live (localhost:8000)
+            </div>
+            <span style="background: #dcfce7; color: #15803d; font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 999px;">STREAMING LIVE</span>
+          </div>
+          <p style="font-size: 0.82rem; color: #14532d; margin-bottom: 12px; line-height: 1.45;">
+            Se hai avviato il server locale sul tuo computer, puoi vedere i log in streaming in tempo reale riga per riga su <a href="http://localhost:8000" target="_blank" style="color: #15803d; font-weight: 700; text-decoration: underline;">localhost:8000</a>:
+          </p>
+          <a href="http://localhost:8000" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; background: #16a34a; color: white; text-decoration: none; padding: 9px 16px; border-radius: 8px; font-weight: 700; font-size: 0.84rem;">
+            <span>🖥️ Apri Console Streaming su localhost:8000 ↗</span>
+          </a>
+        </div>
+
+        <!-- Method 3: CLI Terminal -->
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <div style="font-weight: 800; font-size: 0.95rem; color: #334155;">
+              Metodo 3: Da Riga di Comando Locale (CLI)
+            </div>
+            <span style="background: #e2e8f0; color: #475569; font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 999px;">TERMINALE</span>
+          </div>
+          <p style="font-size: 0.82rem; color: #64748b; margin-bottom: 10px; line-height: 1.4;">
+            Esegui direttamente nel terminale per eseguire la scansione completa e forzata con output dettagliato:
+          </p>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <code id="cliRunCmd" style="flex: 1; background: #0f172a; color: #38bdf8; padding: 8px 12px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;">python scripts/run_monitor.py --force</code>
+            <button type="button" onclick="copyForceCommand()" style="background: #ffffff; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
+              📋 Copia
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1012,6 +1122,14 @@
       document.getElementById("addBookModal").classList.remove("open");
     }
 
+    function openForceCheckModal() {
+      document.getElementById("forceCheckModal").classList.add("open");
+    }
+
+    function closeForceCheckModal(e) {
+      document.getElementById("forceCheckModal").classList.remove("open");
+    }
+
     function updateAddBookActions() {
       let val = document.getElementById("onlineAsinInput").value.trim();
       const m = val.match(/(?:dp|product|gp\/product)\/([A-Z0-9]{10})/i);
@@ -1023,6 +1141,15 @@
 
     function copyCliCommand() {
       const code = document.getElementById("cliCmdCode").innerText;
+      navigator.clipboard.writeText(code).then(() => {
+        alert("Comando copiato negli appunti: " + code);
+      }).catch(() => {
+        prompt("Copia il comando:", code);
+      });
+    }
+
+    function copyForceCommand() {
+      const code = document.getElementById("cliRunCmd").innerText;
       navigator.clipboard.writeText(code).then(() => {
         alert("Comando copiato negli appunti: " + code);
       }).catch(() => {
