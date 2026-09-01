@@ -63,6 +63,21 @@ def extract_origin_country(date_text: Optional[str], default_marketplace: str = 
     meta = MARKETPLACES.get(norm_m, {})
     return meta.get("name", "Italia"), meta.get("flag", "🇮🇹")
 
+def is_page_not_found(html: str, soup: BeautifulSoup) -> bool:
+    if not html:
+        return False
+    html_lower = html.lower()
+    return (
+        "looking for something?" in html_lower or
+        "dogs of amazon" in html_lower or
+        "sorry! we couldn't find that page" in html_lower or
+        "page not found" in html_lower or
+        "pagina non trovata" in html_lower or
+        "seite nicht gefunden" in html_lower or
+        "page non trouvée" in html_lower or
+        "página no encontrada" in html_lower
+    )
+
 def is_blocked_or_unavailable(html: str, soup: BeautifulSoup) -> bool:
     if not html or len(html.strip()) == 0:
         return True
@@ -85,12 +100,6 @@ def is_blocked_or_unavailable(html: str, soup: BeautifulSoup) -> bool:
             t_text = title_tag.get_text(strip=True).lower()
             if any(s in t_text for s in ["accedi", "sign in", "sign-in", "anmelden", "identifiez-vous", "iniciar sesión", "inicia sesión"]):
                 return True
-
-    # Amazon Dog / 404 / Unavailable
-    if "looking for something?" in html_lower or \
-       "dogs of amazon" in html_lower or \
-       "sorry! we couldn't find that page" in html_lower:
-        return True
         
     return False
 
@@ -441,20 +450,24 @@ def parse_amazon_reviews(html: str, asin: str, marketplace: str = "amazon.it") -
         # Title
         title_elem = elem.find("a", {"data-hook": "review-title"}) or \
                      elem.find("span", {"data-hook": "review-title"}) or \
-                     elem.find("a", {"class": lambda c: c and "review-title" in c})
+                     elem.find(["h5", "a", "span"], {"data-hook": lambda h: h and "reviewtitle" in str(h).lower()}) or \
+                     elem.find(["h5", "a"], {"class": lambda c: c and ("review-title" in str(c) or "review_title" in str(c))})
         title = ""
         if title_elem:
-            sub_span = title_elem.find("span", recursive=False)
-            if sub_span:
-                title = sub_span.get_text(strip=True)
-            else:
-                title = title_elem.get_text(strip=True)
-            title = re.sub(r'^[0-9]+[.,]?[0-9]*\s*(?:out of|su|von|sur|de|van|z|po)\s*5\s*(?:stars|stelle|sternen|étoiles|gwiazdek)?', '', title, flags=re.IGNORECASE).strip()
+            import copy
+            t_copy = copy.copy(title_elem)
+            for icon in t_copy.find_all(["i", "span"], {"data-hook": lambda h: h and "star-rating" in str(h).lower()}):
+                icon.decompose()
+            for alt in t_copy.find_all("span", {"class": "a-icon-alt"}):
+                alt.decompose()
+            raw_t = t_copy.get_text(strip=True)
+            title = re.sub(r'^[0-9]+[.,]?[0-9]*\s*(?:out of|su|von|sur|de|van|z|po)\s*5\s*(?:stars|stelle|sternen|étoiles|gwiazdek)?', '', raw_t, flags=re.IGNORECASE).strip()
 
         # Body
         body_elem = elem.find("span", {"data-hook": "review-body"}) or \
                     elem.find("div", {"data-hook": "review-collapsed"}) or \
-                    elem.find("span", {"class": lambda c: c and "review-text" in c})
+                    elem.find("span", {"class": lambda c: c and "review-text" in str(c)}) or \
+                    elem.find("p")
         body = ""
         if body_elem:
             body = body_elem.get_text("\n", strip=True)
@@ -493,9 +506,9 @@ def parse_amazon_reviews(html: str, asin: str, marketplace: str = "amazon.it") -
 
         # Customer Images & Media in review
         review_images = []
-        img_tags = elem.find_all("img", {"class": lambda c: c and "review-image" in c}) or \
-                   elem.find_all("img", {"alt": lambda a: a and "customer image" in a.lower()}) or \
-                   elem.find_all("img", {"data-hook": "review-image-tile"})
+        img_tags = elem.find_all("img", {"class": lambda c: c and ("review-image" in str(c) or "media-popover" in str(c) or "review-image-view" in str(c))}) or \
+                   elem.find_all("img", {"alt": lambda a: a and "customer image" in str(a).lower()}) or \
+                   elem.find_all("img", {"data-hook": lambda h: h and ("review-image" in str(h) or "media" in str(h))})
         for itag in img_tags:
             isrc = itag.get("data-old-hires") or itag.get("data-src") or itag.get("src")
             if isrc and isrc.startswith("http") and not isrc.endswith(".gif") and not "no-img" in isrc:

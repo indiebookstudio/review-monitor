@@ -30,8 +30,15 @@ def main():
         action="store_true",
         help="Force check execution regardless of the configured frequency schedule."
     )
+    parser.add_argument(
+        "--force-alert",
+        action="store_true",
+        help="Force sending review alerts for existing reviews in the catalog."
+    )
     args = parser.parse_args()
 
+    import time
+    start_time = time.time()
     logger.info("Initializing database tables...")
     Base.metadata.create_all(bind=engine)
 
@@ -57,17 +64,18 @@ def main():
                     db.add(AppSetting(key=setting_key, value=str(val)))
         db.commit()
 
-        logger.info(f"Starting review check (force={args.force})...")
-        report = run_all_checks(db, force=args.force)
+        logger.info(f"Starting review check (force={args.force}, force_alert={args.force_alert})...")
+        report = run_all_checks(db, force=args.force, force_alert=args.force_alert)
+        elapsed = time.time() - start_time
         
         if report.get("executed"):
             logger.info(
-                f"Check finished: {report.get('books_checked')} books checked, "
+                f"Check finished in {elapsed:.2f}s: {report.get('books_checked')} books checked, "
                 f"{report.get('total_new_reviews')} new reviews found, "
                 f"{report.get('total_emails_sent', 0)} email(s) sent."
             )
         else:
-            logger.info(f"Check skipped: {report.get('reason')}")
+            logger.info(f"Check skipped in {elapsed:.2f}s: {report.get('reason')}")
 
         # Always update GitHub Pages static dashboard
         try:

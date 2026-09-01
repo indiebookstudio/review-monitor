@@ -13,6 +13,7 @@ from app.amazon.parser import (
     extract_product_price,
     extract_kindle_details,
     is_blocked_or_unavailable,
+    is_page_not_found,
     STATUS_OK,
     STATUS_NO_REVIEWS,
     STATUS_PAGE_UNAVAILABLE,
@@ -22,17 +23,14 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-USER_AGENTS = [
+CHROME_USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14.4; rv:125.0) Gecko/20100101 Firefox/125.0",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
 ]
 
 def get_headers(marketplace: str = "amazon.it") -> dict:
-    ua = random.choice(USER_AGENTS)
+    ua = random.choice(CHROME_USER_AGENTS)
     lang = "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7"
     if "amazon.com" in marketplace or "amazon.ca" in marketplace or "amazon.com.au" in marketplace:
         lang = "en-US,en;q=0.9"
@@ -55,13 +53,37 @@ def get_headers(marketplace: str = "amazon.it") -> dict:
 
     return {
         "User-Agent": ua,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
         "Accept-Language": lang,
-        "Accept-Encoding": "gzip, deflate",
-        "DNT": "1",
-        "Connection": "keep-alive",
+        "Accept-Encoding": "gzip, deflate, br",
         "Upgrade-Insecure-Requests": "1",
+        "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
     }
+
+try:
+    from curl_cffi import requests as cffi_requests
+    HAS_CURL_CFFI = True
+except ImportError:
+    import requests as cffi_requests
+    HAS_CURL_CFFI = False
+
+import threading
+
+_thread_local = threading.local()
+
+def get_http_session(impersonate: str = "chrome124"):
+    if not hasattr(_thread_local, "session") or _thread_local.session is None:
+        if HAS_CURL_CFFI:
+            _thread_local.session = cffi_requests.Session(impersonate=impersonate)
+        else:
+            _thread_local.session = requests.Session()
+    return _thread_local.session
 
 class AmazonClient:
     def __init__(self, use_playwright: Optional[bool] = None):
@@ -70,32 +92,57 @@ class AmazonClient:
     def _fetch_url_resilient(self, url: str, marketplace: str = "amazon.it", max_http_retries: int = 2) -> Tuple[Optional[str], int, Optional[str]]:
         """
         Fetches any Amazon URL with multi-layered fallback:
-        1. Fast HTTP GET with rotated User-Agents, cookies, and retry backoff.
-        2. Stealth Playwright Browser with anti-detection evasions if HTTP is blocked.
+        1. Fast Chrome TLS Impersonation via curl_cffi with persistent session (bypasses Akamai/CloudFront WAF without triggering CAPTCHA).
+        2. Clean HTTP 404 detection (instant return without heavy browser fallback).
+        3. Fallback to standard requests if curl socket error occurs.
+        4. Stealth Playwright Browser fallback ONLY if blocked by CAPTCHA.
         """
-        # 1. Fast HTTP attempts with retries
+        impersonations = ["chrome124", "chrome120", "chrome110"] if HAS_CURL_CFFI else [None]
+
+        # 1. Fast HTTP / TLS-Impersonated GET attempts
         for attempt in range(1, max_http_retries + 1):
             headers = get_headers(marketplace)
+            imp = impersonations[(attempt - 1) % len(impersonations)]
+            resp = None
             try:
-                session = requests.Session()
-                session.headers.update(headers)
-                resp = session.get(url, timeout=12)
+                if HAS_CURL_CFFI and imp:
+                    sess = get_http_session(impersonate=imp)
+                    resp = sess.get(url, headers=headers, timeout=14)
+                else:
+                    session = requests.Session()
+                    session.headers.update(headers)
+                    resp = session.get(url, timeout=12)
+            except Exception as http_e:
+                logger.info(f"HTTP fetch notice on attempt {attempt} for {url}: {http_e}")
+                # Reset thread-local session on socket error
+                if hasattr(_thread_local, "session"):
+                    _thread_local.session = None
+                # Immediate fallback try with standard requests
+                try:
+                    session = requests.Session()
+                    session.headers.update(headers)
+                    resp = session.get(url, timeout=10)
+                except Exception:
+                    pass
+
+            if resp is not None:
                 if resp.status_code == 200:
                     soup = BeautifulSoup(resp.text, "html.parser")
+                    if is_page_not_found(resp.text, soup):
+                        return None, 404, "Page not found (HTTP 404)"
                     if not is_blocked_or_unavailable(resp.text, soup):
                         return resp.text, 200, None
                     logger.warning(f"HTTP attempt {attempt} for {url} encountered CAPTCHA or blocking.")
                 elif resp.status_code == 404:
+                    # Page does not exist on this marketplace - instant return without slow fallback
                     return None, 404, "Page not found (HTTP 404)"
                 elif resp.status_code == 503:
                     logger.warning(f"HTTP 503 Service Unavailable for {url} (attempt {attempt}).")
-            except Exception as http_e:
-                logger.info(f"HTTP fetch error on attempt {attempt} for {url}: {http_e}")
-            
-            if attempt < max_http_retries:
-                time.sleep(random.uniform(0.8, 1.5))
 
-        # 2. Stealth Playwright Browser Fallback
+            if attempt < max_http_retries:
+                time.sleep(random.uniform(0.2, 0.5))
+
+        # 2. Stealth Playwright Browser Fallback (only for true anti-bot blocks, never for 404s)
         if self.use_playwright:
             logger.info(f"Falling back to Playwright Stealth for {url}...")
             content, code, err = self._fetch_playwright(url)
@@ -106,15 +153,18 @@ class AmazonClient:
 
     def fetch_reviews_page(self, asin: str, marketplace: str = "amazon.it") -> Tuple[Optional[str], int, Optional[str]]:
         """
-        Fetches the primary page for an ASIN (tries reviews page, then product page).
+        Fetches the primary page for an ASIN (tries product page /dp/, then reviews page).
         """
-        rev_url = get_reviews_url(asin, marketplace, sort_by_recent=True)
-        content, code, err = self._fetch_url_resilient(rev_url, marketplace)
+        prod_url = get_product_url(asin, marketplace)
+        content, code, err = self._fetch_url_resilient(prod_url, marketplace)
         if content and code == 200:
             return content, 200, None
-            
-        prod_url = get_product_url(asin, marketplace)
-        return self._fetch_url_resilient(prod_url, marketplace)
+
+        if code == 404:
+            return None, 404, "Page not found (HTTP 404)"
+
+        rev_url = get_reviews_url(asin, marketplace, sort_by_recent=True)
+        return self._fetch_url_resilient(rev_url, marketplace)
 
     def fetch_all_reviews_for_book(self, asin: str, marketplace: str = "amazon.it", max_pages: int = 5) -> Dict[str, Any]:
         """
@@ -146,11 +196,19 @@ class AmazonClient:
         prod_url = f"{base}/dp/{clean_asin}"
         html_prod, code_prod, err_prod = self._fetch_url_resilient(prod_url, norm_m)
         
-        # Fallback to /gp/product/ or /product-reviews/ if /dp/ returned 500/unavailable
+        # If product page is 404 / Dog page, product is not on this marketplace
+        if code_prod == 404 or (html_prod and is_page_not_found(html_prod, BeautifulSoup(html_prod, "html.parser"))):
+            combined_result["status"] = STATUS_NO_REVIEWS
+            return combined_result
+
+        # Fallback to /product-reviews/ only if /dp/ returned transient error
         if not html_prod or code_prod != 200:
             logger.info(f"/dp/ page not available for {clean_asin} on {norm_m}. Trying alternative reviews page...")
             alt_url = f"{base}/product-reviews/{clean_asin}?reviewerType=all_reviews&sortBy=recent&pageNumber=1"
             html_prod, code_prod, err_prod = self._fetch_url_resilient(alt_url, norm_m)
+            if code_prod == 404 or (html_prod and is_page_not_found(html_prod, BeautifulSoup(html_prod, "html.parser"))):
+                combined_result["status"] = STATUS_NO_REVIEWS
+                return combined_result
 
         if not html_prod or code_prod != 200:
             error_msg = err_prod or f"HTTP status {code_prod}"
@@ -315,7 +373,10 @@ class AmazonClient:
         code = meta.get("code", "")
 
         try:
-            resp = requests.get(prod_url, headers=headers, timeout=10)
+            if HAS_CURL_CFFI:
+                resp = cffi_requests.get(prod_url, headers=headers, impersonate="chrome124", timeout=10)
+            else:
+                resp = requests.get(prod_url, headers=headers, timeout=10)
             if resp.status_code == 200:
                 html = resp.text
                 if not is_blocked_or_unavailable(html, BeautifulSoup(html, "html.parser")):
@@ -362,7 +423,7 @@ class AmazonClient:
                     "kindle_price": None
                 }
         except Exception as e:
-            logger.info(f"Fast check error for {marketplace}: {e}")
+            logger.info(f"Fast check notice for {marketplace}: {e}")
 
         # If HTTP didn't confirm, treat as not found or fallback
         return {

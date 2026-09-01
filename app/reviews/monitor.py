@@ -83,7 +83,8 @@ def run_book_check(
     client: Optional[AmazonClient] = None,
     force_alert: bool = False,
     send_email_immediately: bool = True,
-    max_retries: int = 2
+    max_retries: int = 2,
+    is_bootstrap: Optional[bool] = None
 ) -> Dict[str, Any]:
     if client is None:
         client = AmazonClient()
@@ -170,15 +171,16 @@ def run_book_check(
     reviews_found_count = len(reviews_list)
     logger.info(f"Retrieved {reviews_found_count} total reviews from Amazon for '{book.title}' on {book.marketplace}")
 
-    # Check if this is the first run for this book (Bootstrap)
-    existing_count = db.query(Review).filter(Review.book_id == book.id).count()
-    is_bootstrap = (existing_count == 0)
+    # Determine bootstrap status
+    if is_bootstrap is None:
+        has_runs = db.query(CheckRun).filter(CheckRun.book_id == book.id).count() > 0
+        existing_rev_count = db.query(Review).filter(Review.book_id == book.id).count()
+        is_bootstrap = (not has_runs) and (existing_rev_count == 0)
 
-    # Existing review IDs for this specific book and marketplace
+    # Existing review IDs for this specific ASIN (deduplicate across global marketplaces)
     existing_review_ids = set(
         r[0] for r in db.query(Review.review_id).filter(
-            Review.book_id == book.id,
-            Review.marketplace == book.marketplace
+            Review.asin == book.asin
         ).all()
     )
 
@@ -278,7 +280,7 @@ def run_book_check(
         "error": None
     }
 
-def run_all_checks(db: Session, force: bool = False, client: Optional[AmazonClient] = None, force_alert: bool = False) -> Dict[str, Any]:
+def run_all_checks(db: Session, force: bool = False, client: Optional[AmazonClient] = None, force_alert: bool = False, max_workers: int = 6) -> Dict[str, Any]:
     if not force and not is_check_due(db):
         logger.info("Check is not due yet. Skipping run.")
         return {
@@ -287,64 +289,55 @@ def run_all_checks(db: Session, force: bool = False, client: Optional[AmazonClie
             "results": []
         }
 
-    logger.info("Starting check run for all active books...")
+    logger.info("Starting check run for all active books in parallel...")
+    from app.database import SessionLocal
+    import concurrent.futures
+
     books = db.query(Book).filter(Book.enabled == True).all()
+    book_ids = [b.id for b in books]
+    total_books_count = len(books)
     results = []
     total_new = 0
     total_emails = 0
     digest_groups = []
-    failed_books: List[Book] = []
 
     if client is None:
-        client = AmazonClient()
+        client = AmazonClient(use_playwright=False)
 
-    # Pass 1: Check all books
-    for book in books:
-        res = run_book_check(book, db, client, force_alert=force_alert, send_email_immediately=False)
-        if not res.get("success"):
-            failed_books.append(book)
-        else:
-            results.append({
-                "book_id": book.id,
-                "title": book.title,
-                "asin": book.asin,
-                "marketplace": book.marketplace,
+    def _check_worker(b_id: int):
+        worker_db = SessionLocal()
+        try:
+            b = worker_db.query(Book).filter(Book.id == b_id).first()
+            if not b:
+                return None
+            res = run_book_check(b, worker_db, client, force_alert=force_alert, send_email_immediately=False, max_retries=1)
+            return {
+                "book_id": b.id,
+                "title": b.title,
+                "asin": b.asin,
+                "marketplace": b.marketplace,
                 "result": res
-            })
-            n_revs = res.get("new_reviews_list", [])
-            if n_revs:
-                digest_groups.append({
-                    "title": book.title,
-                    "marketplace": book.marketplace,
-                    "asin": book.asin,
-                    "reviews": n_revs
-                })
-            total_new += res.get("new_reviews", 0)
+            }
+        finally:
+            worker_db.close()
 
-    # Pass 2: Automatic retry for any book that failed in Pass 1
-    if failed_books:
-        logger.info(f"Retrying {len(failed_books)} book(s) with deep stealth Playwright...")
-        import time
-        time.sleep(3.0)
-        deep_client = AmazonClient(use_playwright=True)
-        for book in failed_books:
-            retry_res = run_book_check(book, db, deep_client, force_alert=force_alert, send_email_immediately=False, max_retries=2)
-            results.append({
-                "book_id": book.id,
-                "title": book.title,
-                "asin": book.asin,
-                "marketplace": book.marketplace,
-                "result": retry_res
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        worker_results = list(executor.map(_check_worker, book_ids))
+
+    for item in worker_results:
+        if not item:
+            continue
+        results.append(item)
+        res = item["result"]
+        n_revs = res.get("new_reviews_list", [])
+        if n_revs:
+            digest_groups.append({
+                "title": item["title"],
+                "marketplace": item["marketplace"],
+                "asin": item["asin"],
+                "reviews": n_revs
             })
-            n_revs = retry_res.get("new_reviews_list", [])
-            if n_revs:
-                digest_groups.append({
-                    "title": book.title,
-                    "marketplace": book.marketplace,
-                    "asin": book.asin,
-                    "reviews": n_revs
-                })
-            total_new += retry_res.get("new_reviews", 0)
+        total_new += res.get("new_reviews", 0)
 
     update_check_schedule_timestamps(db)
 
@@ -353,7 +346,7 @@ def run_all_checks(db: Session, force: bool = False, client: Optional[AmazonClie
     if send_daily_digest_report(
         groups=digest_groups,
         db=db,
-        books_checked=len(books),
+        books_checked=total_books_count,
         total_new=total_new
     ):
         total_emails = 1
@@ -361,15 +354,15 @@ def run_all_checks(db: Session, force: bool = False, client: Optional[AmazonClie
     # Audit log
     audit = AuditLog(
         action="MONITOR_RUN",
-        details=f"Eseguito controllo per {len(books)} libri. Nuove recensioni: {total_new}. Email inviate: {total_emails}."
+        details=f"Eseguito controllo per {total_books_count} libri. Nuove recensioni: {total_new}. Email inviate: {total_emails}."
     )
     db.add(audit)
     db.commit()
 
-    logger.info(f"Check run completed. Checked {len(books)} books. New reviews: {total_new}. Emails: {total_emails}.")
+    logger.info(f"Check run completed. Checked {total_books_count} books. New reviews: {total_new}. Emails: {total_emails}.")
     return {
         "executed": True,
-        "books_checked": len(books),
+        "books_checked": total_books_count,
         "total_new_reviews": total_new,
         "total_emails_sent": total_emails,
         "results": results
